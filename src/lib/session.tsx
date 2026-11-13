@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 import { isSupabaseConfigured } from '@/config';
 
 import { forgetAccount, rememberSession } from './accounts';
+import { PROVIDER_NAME, fetchProviders } from './auth-providers';
 import { readConsent, saveConsent, syncConsentToProfile, type ConsentRecord } from './consent';
 import { supabase } from './supabase';
 
@@ -141,6 +142,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return null;
       },
       signInOAuth: async (provider) => {
+        // Supabase answers a disabled provider with a bare error page on web; catch it here instead.
+        const enabled = await fetchProviders();
+        if (enabled && !enabled[provider]) return `${PROVIDER_NAME[provider]} sign-in isn't set up yet. Use email or continue as a guest.`;
         const redirectTo = oauthRedirectUrl();
         if (Platform.OS === 'web') {
           const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });

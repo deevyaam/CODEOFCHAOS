@@ -6,12 +6,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Logo } from '@/components/logo';
 import { Button, Card, Notice, PressableScale, Segmented, Text } from '@/components/ui';
 import { APP_NAME, isSupabaseConfigured } from '@/config';
+import { useProviders } from '@/lib/auth-providers';
 import { useSession } from '@/lib/session';
 import { GUTTER, radius, spacing, useTheme } from '@/theme';
 
 export default function SignIn() {
   const { signInEmail, signUpEmail, signInOAuth, signInGuest } = useSession();
   const { colors, type } = useTheme();
+  const providers = useProviders();
+  // Hide buttons for providers that are switched off; show both if the check couldn't run.
+  const showGoogle = providers?.google ?? true;
+  const showFacebook = providers?.facebook ?? true;
+  const showGuest = providers?.anonymous ?? true;
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [name, setName] = useState('');
@@ -53,16 +59,20 @@ export default function SignIn() {
           </Notice>
         )}
 
-        <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
-          <SocialButton provider="google" busy={busy === 'google'} onPress={() => run('google', () => signInOAuth('google'))} />
-          <SocialButton provider="facebook" busy={busy === 'facebook'} onPress={() => run('facebook', () => signInOAuth('facebook'))} />
-        </View>
+        {(showGoogle || showFacebook) && (
+          <>
+            <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+              {showGoogle && <SocialButton provider="google" busy={busy === 'google'} onPress={() => run('google', () => signInOAuth('google'))} />}
+              {showFacebook && <SocialButton provider="facebook" busy={busy === 'facebook'} onPress={() => run('facebook', () => signInOAuth('facebook'))} />}
+            </View>
 
-        <View style={styles.or}>
-          <View style={[styles.line, { backgroundColor: colors.separator }]} />
-          <Text variant="caption" muted>or with email</Text>
-          <View style={[styles.line, { backgroundColor: colors.separator }]} />
-        </View>
+            <View style={styles.or}>
+              <View style={[styles.line, { backgroundColor: colors.separator }]} />
+              <Text variant="caption" muted>or with email</Text>
+              <View style={[styles.line, { backgroundColor: colors.separator }]} />
+            </View>
+          </>
+        )}
 
         <Card style={{ gap: spacing.md }}>
           <Segmented
@@ -126,7 +136,9 @@ export default function SignIn() {
           </View>
         )}
 
-        <Button
+        {showGuest && (
+          <>
+          <Button
           kind="ghost"
           title="Continue as guest"
           icon="eye-outline"
@@ -137,6 +149,8 @@ export default function SignIn() {
         <Text variant="small" muted style={{ textAlign: 'center' }}>
           Guests can browse reports, the map, weather and the assistant, but can’t post, comment, react or join the Discussion.
         </Text>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

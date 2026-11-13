@@ -32,17 +32,37 @@ export default function Account() {
     await refreshProfile();
   };
 
+  const [uploading, setUploading] = useState(false);
+
   const uploadPhoto = async () => {
     if (!user) return;
+    setMsg(null);
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.6 });
     if (res.canceled) return;
     const a = res.assets[0];
-    const path = `${user.id}/avatar.jpg`;
-    const body = await (await fetch(a.uri)).arrayBuffer();
-    const { error } = await supabase.storage.from(BUCKETS.avatars).upload(path, body, { contentType: a.mimeType ?? 'image/jpeg', upsert: true });
-    if (error) return setMsg({ tone: 'danger', text: error.message });
-    await update({ avatar_kind: 'photo', avatar_path: path });
-    setEditAvatar(false);
+    const type = a.mimeType ?? 'image/jpeg';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+      return setMsg({ tone: 'danger', text: 'Please choose a JPEG, PNG or WebP photo.' });
+    }
+    setUploading(true);
+    try {
+      // A new file name each time: no overwrite needed, and no old cached picture.
+      const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const body = await (await fetch(a.uri)).arrayBuffer();
+      const { error } = await supabase.storage.from(BUCKETS.avatars).upload(path, body, { contentType: type });
+      if (error) throw error;
+      const old = profile?.avatar_path;
+      const { error: e2 } = await supabase.from('profiles').update({ avatar_kind: 'photo', avatar_path: path }).eq('id', user.id);
+      if (e2) throw e2;
+      if (old && old !== path) supabase.storage.from(BUCKETS.avatars).remove([old]).catch(() => {});
+      await refreshProfile();
+      setEditAvatar(false);
+    } catch (e) {
+      setMsg({ tone: 'danger', text: `Your photo couldn't be saved: ${e instanceof Error ? e.message : 'unknown error'}` });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const deleteAccount = async () => {
@@ -137,7 +157,12 @@ export default function Account() {
       </Page>
 
       <Sheet visible={editAvatar} onClose={() => setEditAvatar(false)} title="Profile picture">
-        <AvatarEditor profile={profile} onPhoto={uploadPhoto} onChange={update} />
+        <AvatarEditor profile={profile} onPhoto={uploadPhoto} onChange={update} uploading={uploading} />
+        {msg?.tone === 'danger' && (
+          <View style={{ marginTop: spacing.md }}>
+            <Notice tone="danger"><Text>{msg.text}</Text></Notice>
+          </View>
+        )}
       </Sheet>
 
       <Sheet visible={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete your account?">
@@ -160,7 +185,17 @@ export default function Account() {
   );
 }
 
-function AvatarEditor({ profile, onPhoto, onChange }: { profile: Profile | null; onPhoto: () => void; onChange: (p: Partial<Profile>) => void }) {
+function AvatarEditor({
+  profile,
+  onPhoto,
+  onChange,
+  uploading,
+}: {
+  profile: Profile | null;
+  onPhoto: () => void;
+  onChange: (p: Partial<Profile>) => void;
+  uploading: boolean;
+}) {
   const { colors } = useTheme();
   const kind = profile?.avatar_kind ?? 'initials';
   const color = profile?.avatar_color ?? AVATAR_COLORS[0];
@@ -168,14 +203,14 @@ function AvatarEditor({ profile, onPhoto, onChange }: { profile: Profile | null;
     <View style={{ gap: spacing.md }}>
       <Segmented
         value={kind}
-        onChange={(k) => (k === 'photo' ? onPhoto() : onChange({ avatar_kind: k, avatar_icon: k === 'icon' ? profile?.avatar_icon ?? 'person' : profile?.avatar_icon ?? null }))}
+        onChange={(k) => (k === 'photo' ? (profile?.avatar_path ? onChange({ avatar_kind: 'photo' }) : onPhoto()) : onChange({ avatar_kind: k, avatar_icon: k === 'icon' ? profile?.avatar_icon ?? 'person' : profile?.avatar_icon ?? null }))}
         options={[
           { value: 'photo', label: 'Photo', icon: 'image-outline' },
           { value: 'icon', label: 'Icon', icon: 'happy-outline' },
           { value: 'initials', label: 'Initials', icon: 'text' },
         ]}
       />
-      {kind === 'photo' && <Button kind="secondary" icon="images-outline" title="Choose a photo" onPress={onPhoto} />}
+      {kind === 'photo' && <Button kind="secondary" icon="images-outline" title={profile?.avatar_path ? 'Choose another photo' : 'Choose a photo'} loading={uploading} onPress={onPhoto} />}
       {kind === 'icon' && (
         <View style={styles.wrap}>
           {AVATAR_ICONS.map((ic) => (

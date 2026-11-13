@@ -1,42 +1,98 @@
 {
   "expo": {
-    "name": "COC",
-    "slug": "COC",
+    "name": "Life Powered by Tech",
+    "slug": "life-powered-by-tech",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "coc",
+    "scheme": "lifepoweredbytech",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "mu.lifepoweredbytech.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Your location is used to show nearby reports and weather, and to pin a report — only when you choose.",
+        "NSCameraUsageDescription": "Take photos or videos to add to a report.",
+        "NSPhotoLibraryUsageDescription": "Choose photos or videos to add to a report, comment or message.",
+        "NSFaceIDUsageDescription": "Unlock the app and approve important actions.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0E7C74",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "mu.lifepoweredbytech.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0E7C74",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 96
         }
-      ]
+      ],
+      "expo-secure-store",
+      [
+        "expo-video",
+        {
+          "supportsPictureInPicture": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Your location is used to show nearby reports and weather, and to pin a report — only when you choose."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos or videos to add to a report, comment or message.",
+          "cameraPermission": "Take photos or videos to add to a report."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Unlock the app and approve important actions."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0E7C74"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {}
     }
   }
 }

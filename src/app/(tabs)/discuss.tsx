@@ -9,14 +9,14 @@ import { FlagSheet, QuickReactions, ReactionBar, blockUser } from '@/components/
 import { useKeyboardVisible, useTabBarSpace } from '@/components/layout';
 import { MediaStrip } from '@/components/media-view';
 import { Sheet } from '@/components/sheet';
-import { Empty, Icon, Notice, PressableScale, Row, Text } from '@/components/ui';
+import { Empty, Icon, Notice, PressableScale, Row, Text, type IconName } from '@/components/ui';
 import { summariseReactions } from '@/lib/discussion';
 import { setPref } from '@/lib/prefs';
-import { badgeLabel, useProfiles } from '@/lib/profiles';
+import { badgeLabel, useProfiles, type PublicProfile } from '@/lib/profiles';
 import { timeAgo, uploadMedia, type MediaItem } from '@/lib/reports';
 import { useSession } from '@/lib/session';
 import { BUCKETS, supabase } from '@/lib/supabase';
-import { GUTTER, radius, spacing, useTheme } from '@/theme';
+import { GUTTER, radius, spacing, useTheme, type Colors } from '@/theme';
 
 type Message = {
   id: string;
@@ -30,6 +30,13 @@ type Message = {
 type Reaction = { message_id: string; user_id: string; emoji: string };
 
 const PAGE = 100;
+
+/** Bubble colour by who wrote it: authorities blue, moderators/admins violet, everyone else plain (yours tinted). */
+function bubbleTone(p: PublicProfile | undefined, mine: boolean, colors: Colors): { background: string; accent: string; icon: IconName | null } {
+  if (p?.badge === 'authority') return { background: colors.authoritySoft, accent: colors.authority, icon: 'checkmark-circle' };
+  if (p?.badge === 'moderator' || p?.badge === 'admin') return { background: colors.moderatorSoft, accent: colors.moderator, icon: 'shield-checkmark' };
+  return { background: mine ? colors.primarySoft : colors.surface, accent: colors.textMuted, icon: null };
+}
 
 export default function Discuss() {
   const { user, isGuest } = useSession();
@@ -175,16 +182,26 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
             const name = p?.full_name || 'Member';
             const mine = m.user_id === userId;
             const parent = m.reply_to ? byId.get(m.reply_to) : null;
+            const tone = bubbleTone(p, mine, colors);
+            const badge = badgeLabel(p);
             return (
               <PressableScale
                 onLongPress={() => setActions(m)}
                 delayLongPress={300}
                 accessibilityHint="Long press for reply, react and more"
-                style={[styles.bubble, { backgroundColor: mine ? colors.primarySoft : colors.surface, boxShadow: shadows.card }]}>
+                style={[styles.bubble, { backgroundColor: tone.background, boxShadow: shadows.card }]}>
                 <View style={styles.byline}>
                   <Avatar profile={p ?? null} name={name} size={28} />
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text variant="label" numberOfLines={1}>{mine ? 'You' : name}{badgeLabel(p) ? ` · ${badgeLabel(p)}` : ''}</Text>
+                    <View style={styles.nameRow}>
+                      <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>{mine ? 'You' : name}</Text>
+                      {badge && tone.icon && (
+                        <View style={styles.badge}>
+                          <Icon name={tone.icon} size={13} color={tone.accent} />
+                          <Text variant="small" color={tone.accent} numberOfLines={1} style={{ flexShrink: 1 }}>{badge}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text variant="small" muted>{timeAgo(m.created_at)}</Text>
                   </View>
                   <PressableScale onPress={() => setActions(m)} accessibilityRole="button" accessibilityLabel="Message actions">
@@ -325,6 +342,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: GUTTER, paddingBottom: spacing.sm, width: '100%', maxWidth: 760, alignSelf: 'center' },
   bubble: { borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   byline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1, minWidth: 0 },
   quote: { borderLeftWidth: 3, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: 6 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: GUTTER },
   composerWrap: { paddingHorizontal: 12, width: '100%', maxWidth: 760, alignSelf: 'center' },

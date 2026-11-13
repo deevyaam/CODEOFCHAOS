@@ -283,7 +283,16 @@ begin
     new.user_id := null;
   end if;
   if new.status_change is not null then
-    if not (public.owns_report(new.report_id) or public.has_role('authority') or public.has_role('moderator')) then
+    -- Moderators/admins and verified authorities can set any status. The reporter can move their own report
+    -- along (sent, in progress) but only staff can close it (fixed) or reopen a fixed one.
+    if public.has_role('authority') or public.has_role('moderator') then
+      null;
+    elsif public.owns_report(new.report_id) then
+      if new.status_change = 'fixed'
+         or exists (select 1 from public.reports r where r.id = new.report_id and r.status = 'fixed') then
+        raise exception 'Only moderators and verified authorities can close or reopen a report';
+      end if;
+    else
       raise exception 'Only the reporter, verified authorities and moderators can change the status';
     end if;
   else

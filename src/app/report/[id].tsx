@@ -49,7 +49,7 @@ type Reaction = { comment_id: string; user_id: string; emoji: string };
 
 export default function ReportDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, isGuest, roles } = useSession();
+  const { user, isGuest, roles, limits } = useSession();
   const { colors, type } = useTheme();
   const insets = useSafeAreaInsets();
   const [report, setReport] = useState<Report | null>(null);
@@ -314,7 +314,7 @@ export default function ReportDetail() {
         {error && <Notice tone="danger"><Text>{error}</Text></Notice>}
       </ScrollView>
 
-      {!isGuest ? (
+      {!isGuest && !limits.no_comments ? (
         <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm, backgroundColor: colors.surface }]}>
           {photo && (
             <View style={styles.rowBetween}>
@@ -358,7 +358,9 @@ export default function ReportDetail() {
         </View>
       ) : (
         <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm, backgroundColor: colors.surface }]}>
-          <Text variant="caption" muted style={{ textAlign: 'center' }}>Sign in to comment and react.</Text>
+          <Text variant="caption" muted style={{ textAlign: 'center' }}>
+            {isGuest ? 'Sign in to comment and react.' : 'A moderator has paused your comments for now.'}
+          </Text>
         </View>
       )}
 

@@ -20,6 +20,7 @@ import { EMERGENCY_NUMBERS } from '@/config';
 import { nearestTown, TOWNS } from '@/lib/places';
 import { usePref } from '@/lib/prefs';
 import { useReadAloud } from '@/lib/read-aloud';
+import { ChoiceCard } from '@/components/choice-card';
 import {
   CATEGORIES,
   PIN_COLORS,
@@ -93,7 +94,7 @@ const NEED: Record<number, string> = {
 };
 
 export default function NewReport() {
-  const { user, isGuest } = useSession();
+  const { user, isGuest, limits } = useSession();
   const { colors, type } = useTheme();
   const insets = useSafeAreaInsets();
   const anonDefault = usePref('anonymousDefault');
@@ -145,6 +146,18 @@ export default function NewReport() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StackHeader title="Report a problem" />
         <Empty icon="lock-closed-outline" title="Sign in to report a problem" body="Guests can look at reports but can’t send one." />
+      </View>
+    );
+  }
+  if (limits.no_reports) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <StackHeader title="Report a problem" />
+        <Empty
+          icon="pause-circle-outline"
+          title="Reporting is paused for your account"
+          body={`A moderator has paused new reports from you for now.${limits.reason ? ` Reason: ${limits.reason}` : ''} You can still read reports and say “me too”.`}
+        />
       </View>
     );
   }
@@ -592,49 +605,6 @@ export default function NewReport() {
   );
 }
 
-/** A big, tappable answer: icon, plain title, one-line hint and a clear tick when chosen. */
-function ChoiceCard({
-  icon,
-  iconBg,
-  title,
-  hint,
-  selected,
-  busy,
-  onPress,
-}: {
-  icon: IconName;
-  iconBg?: string;
-  title: string;
-  hint: string;
-  selected: boolean;
-  busy?: boolean;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  return (
-    <PressableScale
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected, busy }}
-      accessibilityLabel={`${title}. ${hint}`}
-      style={[
-        styles.choice,
-        { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : 'transparent' },
-      ]}>
-      <View style={[styles.choiceIcon, { backgroundColor: iconBg ?? (selected ? colors.primary : colors.surfaceMuted) }]}>
-        <Icon name={icon} size={26} color={iconBg || selected ? '#fff' : colors.textMuted} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text variant="headline">{title}</Text>
-        <Text variant="caption" muted>{busy ? 'Finding where you are…' : hint}</Text>
-      </View>
-      <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.textFaint, backgroundColor: selected ? colors.primary : 'transparent' }]}>
-        {selected && <Icon name="checkmark" size={18} color={colors.onPrimary} />}
-      </View>
-    </PressableScale>
-  );
-}
-
 function ReviewRow({
   icon,
   iconBg,
@@ -685,9 +655,6 @@ const styles = StyleSheet.create({
   bar: { flex: 1, height: 6, borderRadius: 3 },
   questionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   listen: { minWidth: 64, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: spacing.sm },
-  choice: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 76, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 2 },
-  choiceIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   input: { minHeight: 54, borderRadius: radius.md, paddingHorizontal: spacing.lg },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   twoButtons: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },

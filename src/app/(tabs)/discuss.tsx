@@ -76,9 +76,10 @@ export default function Discuss() {
 
 function Room({ userId, focused }: { userId: string; focused: boolean }) {
   const { colors, type, shadows } = useTheme();
-  const { roles } = useSession();
+  const { roles, limits } = useSession();
   const isStaff = roles.is_admin || roles.is_moderator || roles.authority_verified;
   const myRole: Message['deleted_by_role'] = roles.is_admin || roles.is_moderator ? 'moderator' : 'authority';
+  const paused = limits.no_discussion;
   const insets = useSafeAreaInsets();
   const tabSpace = useTabBarSpace();
   const keyboard = useKeyboardVisible();
@@ -277,6 +278,15 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
         />
       )}
 
+      {paused ? (
+        <View style={[styles.composerWrap, { marginBottom: composerBottom }]}>
+          <View style={[styles.composer, { backgroundColor: colors.surface, boxShadow: shadows.raised }]}>
+            <Text variant="caption" muted style={{ textAlign: 'center' }}>
+              A moderator has paused your messages here for now. You can still read the Discussion.
+            </Text>
+          </View>
+        </View>
+      ) : (
       <View style={[styles.composerWrap, { marginBottom: composerBottom }]}>
       <View style={[styles.composer, { backgroundColor: colors.surface, boxShadow: shadows.raised }]}>
         {error && <Notice tone="danger"><Text variant="caption">{error}</Text></Notice>}
@@ -340,6 +350,7 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
         </View>
       </View>
       </View>
+      )}
 
       <Sheet visible={!!actions} onClose={() => setActions(null)}>
         {actions && (

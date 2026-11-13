@@ -33,6 +33,10 @@ export type Roles = {
 
 const NO_ROLES: Roles = { is_admin: false, is_moderator: false, authority_name: null, authority_verified: false };
 
+/** What a moderator has paused for this member. Only they and moderators can see it. */
+export type Limits = { no_reports: boolean; no_comments: boolean; no_discussion: boolean; reason: string | null };
+const NO_LIMITS: Limits = { no_reports: false, no_comments: false, no_discussion: false, reason: null };
+
 type SessionState = {
   ready: boolean;
   consent: ConsentRecord | null;
@@ -41,6 +45,7 @@ type SessionState = {
   isGuest: boolean;
   profile: Profile | null;
   roles: Roles;
+  limits: Limits;
   /** Moderator, admin or verified authority. */
   isStaff: boolean;
   acceptConsent: () => Promise<void>;
@@ -66,6 +71,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<Roles>(NO_ROLES);
+  const [limits, setLimits] = useState<Limits>(NO_LIMITS);
 
   const user = session?.user ?? null;
   const isGuest = Boolean(user?.is_anonymous);
@@ -74,14 +80,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (!u || !isSupabaseConfigured) {
       setProfile(null);
       setRoles(NO_ROLES);
+      setLimits(NO_LIMITS);
       return;
     }
-    const [{ data: p }, { data: r }] = await Promise.all([
+    const [{ data: p }, { data: r }, { data: l }] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', u.id).maybeSingle(),
       supabase.from('user_roles').select('*').eq('user_id', u.id).maybeSingle(),
+      supabase.from('user_restrictions').select('no_reports,no_comments,no_discussion,reason').eq('user_id', u.id).maybeSingle(),
     ]);
     setProfile((p as Profile | null) ?? null);
     setRoles(r ? { ...NO_ROLES, ...(r as Roles) } : NO_ROLES);
+    setLimits(l ? { ...NO_LIMITS, ...(l as Limits) } : NO_LIMITS);
   }, []);
 
   useEffect(() => {
@@ -124,6 +133,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isGuest,
       profile,
       roles,
+      limits,
       isStaff: roles.is_admin || roles.is_moderator || roles.authority_verified,
       acceptConsent: async () => setConsent(await saveConsent()),
       refreshProfile: () => loadProfile(user),
@@ -172,7 +182,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut({ scope: 'local' });
       },
     }),
-    [ready, consent, session, user, isGuest, profile, roles, loadProfile],
+    [ready, consent, session, user, isGuest, profile, roles, limits, loadProfile],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

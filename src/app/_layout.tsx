@@ -75,6 +75,8 @@ function AppShell({ assetsReady }: { assetsReady: boolean }) {
             <Stack.Screen name="account" />
             <Stack.Screen name="blocked" />
             <Stack.Screen name="moderation" />
+            <Stack.Screen name="people" />
+            <Stack.Screen name="people/[id]" />
             <Stack.Screen name="issues" />
           </Stack.Protected>
           <Stack.Screen name="auth-callback" />

@@ -51,6 +51,7 @@ export default function Home() {
         { title: 'Discuss', subtitle: 'Talk with members', icon: 'chatbubbles', href: '/discuss' },
         { title: 'All reports', subtitle: 'Browse, search and say “me too”', icon: 'document-text', href: '/reports', guestOk: true },
         { title: 'Moderation', subtitle: 'Flagged posts', icon: 'shield-half', href: '/moderation', show: roles.is_moderator || roles.is_admin },
+        { title: 'People & roles', subtitle: 'Make moderators and authorities, pause posting', icon: 'people', href: '/people', show: roles.is_moderator || roles.is_admin },
       ],
     },
     {

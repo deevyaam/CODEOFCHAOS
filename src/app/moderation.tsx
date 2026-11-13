@@ -75,7 +75,10 @@ export default function Moderation() {
 
   return (
     <Screen>
-      <StackHeader title="Moderation" />
+      <StackHeader
+        title="Moderation"
+        right={<Button kind="secondary" icon="people" title="People" onPress={() => router.push('/people')} accessibilityLabel="People and roles" />}
+      />
       <Page tab={false}>
         <Segmented value={view} onChange={setView} options={[{ value: 'open', label: 'To review' }, { value: 'closed', label: 'Handled' }]} />
         {error && <View style={{ marginTop: spacing.lg }}><Notice tone="danger"><Text>{error}</Text></Notice></View>}

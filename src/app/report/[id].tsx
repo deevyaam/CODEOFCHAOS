@@ -68,7 +68,10 @@ export default function ReportDetail() {
   const { voted, toggle, canVote } = useVotes(reports);
   const profiles = useProfiles([report?.author_id ?? '', ...comments.map((c) => c.user_id ?? '')].filter(Boolean));
 
-  const canChangeStatus = !isGuest && (isOwner || roles.authority_verified || roles.is_moderator || roles.is_admin);
+  // Staff (moderators, admins, verified authorities) can set any status. The reporter can move their own report
+  // along, but only staff can close it (Fixed) or reopen it once fixed. The database enforces the same rule.
+  const isStaff = !isGuest && (roles.authority_verified || roles.is_moderator || roles.is_admin);
+  const canChangeStatus = isStaff || (!isGuest && isOwner && report?.status !== 'fixed');
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('reports').select('*').eq('id', id).maybeSingle();
@@ -360,15 +363,19 @@ export default function ReportDetail() {
       )}
 
       <Sheet visible={sheet === 'status'} onClose={() => setSheet(null)} title="Update status">
-        {STATUSES.map((s) => (
-          <Row
-            key={s.value}
-            icon={s.icon}
-            title={s.label}
-            right={report.status === s.value ? <Icon name="checkmark" color={colors.primary} /> : undefined}
-            onPress={report.status === s.value ? undefined : () => changeStatus(s.value)}
-          />
-        ))}
+        {STATUSES.map((s) => {
+          const staffOnly = s.value === 'fixed' && !isStaff;
+          return (
+            <Row
+              key={s.value}
+              icon={staffOnly ? 'lock-closed-outline' : s.icon}
+              title={s.label}
+              subtitle={staffOnly ? 'Only moderators and authorities can close a report' : undefined}
+              right={report.status === s.value ? <Icon name="checkmark" color={colors.primary} /> : undefined}
+              onPress={report.status === s.value || staffOnly ? undefined : () => changeStatus(s.value)}
+            />
+          );
+        })}
         <Text variant="small" muted style={{ marginTop: spacing.sm }}>
           The change appears in the timeline with your name, and people following the report are notified.
         </Text>

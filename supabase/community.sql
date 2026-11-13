@@ -12,10 +12,19 @@ create table if not exists public.discussion_messages (
   media jsonb not null default '[]'::jsonb check (jsonb_typeof(media) = 'array' and jsonb_array_length(media) <= 4),
   reply_to uuid references public.discussion_messages (id) on delete set null,
   hidden boolean not null default false,
-  created_at timestamptz not null default now(),
-  check (char_length(body) > 0 or jsonb_array_length(media) > 0)
+  created_at timestamptz not null default now()
 );
 create index if not exists discussion_created_idx on public.discussion_messages (created_at desc);
+
+-- Removed by staff: the row stays (emptied) so the room shows "Message deleted by a moderator / an authority".
+alter table public.discussion_messages add column if not exists deleted_at timestamptz;
+alter table public.discussion_messages add column if not exists deleted_by_role text
+  check (deleted_by_role in ('moderator', 'authority'));
+-- A message needs text or media, unless staff deleted it. (Replaces the original unnamed check.)
+alter table public.discussion_messages drop constraint if exists discussion_messages_check;
+alter table public.discussion_messages drop constraint if exists discussion_messages_content_check;
+alter table public.discussion_messages add constraint discussion_messages_content_check
+  check (char_length(body) > 0 or jsonb_array_length(media) > 0 or deleted_at is not null);
 
 -- One reaction per person per message.
 create table if not exists public.discussion_reactions (
@@ -37,7 +46,7 @@ create policy dm_select on public.discussion_messages for select to authenticate
 );
 drop policy if exists dm_insert on public.discussion_messages;
 create policy dm_insert on public.discussion_messages for insert to authenticated
-  with check (user_id = (select auth.uid()) and not public.is_guest() and not hidden);
+  with check (user_id = (select auth.uid()) and not public.is_guest() and not hidden and deleted_at is null and deleted_by_role is null);
 drop policy if exists dm_delete on public.discussion_messages;
 create policy dm_delete on public.discussion_messages for delete to authenticated
   using (user_id = (select auth.uid()) or public.is_admin());
@@ -112,6 +121,55 @@ begin
 end $$;
 revoke all on function public.moderate(text, uuid, text) from public, anon;
 grant execute on function public.moderate(text, uuid, text) to authenticated;
+
+-- staff_delete_message(): moderators/admins and verified authorities remove a normal member's Discuss message.
+-- The text, media and reactions are removed; the row stays so everyone sees who removed it (by role, not by name).
+-- Messages from other staff can't be removed this way.
+create or replace function public.staff_delete_message(p_id uuid)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_author uuid;
+  v_role text;
+begin
+  if public.has_role('moderator') then
+    v_role := 'moderator';
+  elsif public.has_role('authority') then
+    v_role := 'authority';
+  else
+    raise exception 'Only moderators and verified authorities can delete other people''s messages';
+  end if;
+
+  select user_id into v_author from public.discussion_messages where id = p_id and deleted_at is null;
+  if not found then
+    raise exception 'Message not found or already deleted';
+  end if;
+  if exists (
+    select 1 from public.user_roles r
+    where r.user_id = v_author and (r.is_admin or r.is_moderator or r.authority_verified)
+  ) then
+    raise exception 'Messages from moderators and authorities can''t be deleted this way';
+  end if;
+
+  -- Queue the message's photos/videos for removal from Storage.
+  insert into public.media_trash (bucket, path)
+    select 'discussion-media', item ->> 'path'
+    from public.discussion_messages m, jsonb_array_elements(m.media) item
+    where m.id = p_id and item ? 'path';
+  if found then
+    insert into public.event_queue (kind, payload) values ('media_cleanup', '{}'::jsonb);
+  end if;
+
+  update public.discussion_messages
+    set body = '', media = '[]'::jsonb, deleted_at = now(), deleted_by_role = v_role
+    where id = p_id;
+  delete from public.discussion_reactions where message_id = p_id;
+  update public.content_flags
+    set status = 'actioned', handled_by = auth.uid(), handled_at = now()
+    where target_type = 'message' and target_id = p_id and status = 'open';
+end $$;
+revoke all on function public.staff_delete_message(uuid) from public, anon;
+grant execute on function public.staff_delete_message(uuid) to authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Assistant chats (guests' chats are never saved: insert blocked for guests)

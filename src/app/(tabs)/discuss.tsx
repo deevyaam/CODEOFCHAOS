@@ -1,7 +1,7 @@
 import { useIsFocused } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -26,10 +26,30 @@ type Message = {
   reply_to: string | null;
   hidden: boolean;
   created_at: string;
+  /** Set when a moderator or authority removed the message (body and media are then empty). */
+  deleted_at: string | null;
+  deleted_by_role: 'moderator' | 'authority' | null;
 };
 type Reaction = { message_id: string; user_id: string; emoji: string };
 
 const PAGE = 100;
+
+const deletedLabel = (m: Pick<Message, 'deleted_by_role'>) =>
+  m.deleted_by_role === 'authority' ? 'Message deleted by an authority' : 'Message deleted by a moderator';
+
+/** Short preview of a message for reply quotes. */
+const preview = (m: Message) => (m.deleted_at ? 'Deleted message' : m.body || 'Photo');
+
+function confirmAction(title: string, message: string, action: string, onConfirm: () => void) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: action, style: 'destructive', onPress: onConfirm },
+  ]);
+}
 
 /** Bubble colour by who wrote it: authorities blue, moderators/admins green, everyone else plain (yours tinted). */
 function bubbleTone(p: PublicProfile | undefined, mine: boolean, colors: Colors): { background: string; accent: string; icon: IconName | null } {
@@ -56,6 +76,9 @@ export default function Discuss() {
 
 function Room({ userId, focused }: { userId: string; focused: boolean }) {
   const { colors, type, shadows } = useTheme();
+  const { roles } = useSession();
+  const isStaff = roles.is_admin || roles.is_moderator || roles.authority_verified;
+  const myRole: Message['deleted_by_role'] = roles.is_admin || roles.is_moderator ? 'moderator' : 'authority';
   const insets = useSafeAreaInsets();
   const tabSpace = useTabBarSpace();
   const keyboard = useKeyboardVisible();
@@ -150,6 +173,22 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
     load();
   };
 
+  // Moderators and authorities remove a normal member's message; the room then shows who removed it (by role).
+  const staffDelete = (m: Message) => {
+    setActions(null);
+    confirmAction(
+      'Delete this message?',
+      `It will be removed for everyone and replaced with “${deletedLabel({ deleted_by_role: myRole })}”. This can’t be undone.`,
+      'Delete',
+      async () => {
+        const { error: e } = await supabase.rpc('staff_delete_message', { p_id: m.id });
+        if (!e) setMessages((ms) => ms.map((x) => (x.id === m.id ? { ...x, body: '', media: [], deleted_at: new Date().toISOString(), deleted_by_role: myRole } : x)));
+        if (e) setError(e.message);
+        load();
+      },
+    );
+  };
+
   const canSend = !sending && (!!text.trim() || attach.length > 0);
 
   const composerBottom = keyboard ? insets.bottom + spacing.sm : tabSpace - spacing.lg;
@@ -184,6 +223,19 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
             const parent = m.reply_to ? byId.get(m.reply_to) : null;
             const tone = bubbleTone(p, mine, colors);
             const badge = badgeLabel(p);
+            if (m.deleted_at) {
+              return (
+                <View style={[styles.bubble, styles.deleted, { backgroundColor: colors.surfaceMuted }]} accessibilityLabel={`${deletedLabel(m)}, originally from ${mine ? 'you' : name}`}>
+                  <Icon name="shield-checkmark-outline" size={18} color={colors.textMuted} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="caption" muted style={{ fontStyle: 'italic' }}>{deletedLabel(m)}</Text>
+                    <Text variant="small" color={colors.textFaint} numberOfLines={1}>
+                      {mine ? 'Your message' : `From ${name}`} · {timeAgo(m.created_at)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
             return (
               <PressableScale
                 onLongPress={() => setActions(m)}
@@ -211,7 +263,7 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
                 {parent && (
                   <View style={[styles.quote, { borderLeftColor: colors.primary, backgroundColor: colors.surfaceMuted }]}>
                     <Text variant="small" muted numberOfLines={2}>
-                      {profiles.get(parent.user_id)?.full_name || 'Member'}: {parent.body || 'Photo'}
+                      {profiles.get(parent.user_id)?.full_name || 'Member'}: {preview(parent)}
                     </Text>
                   </View>
                 )}
@@ -232,7 +284,7 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
           <View style={styles.replyBar}>
             <Icon name="return-down-forward" size={16} color={colors.primary} />
             <Text variant="caption" muted numberOfLines={1} style={{ flex: 1 }}>
-              Replying to {profiles.get(replyTo.user_id)?.full_name || 'Member'}: {replyTo.body || 'Photo'}
+              Replying to {profiles.get(replyTo.user_id)?.full_name || 'Member'}: {preview(replyTo)}
             </Text>
             <PressableScale onPress={() => setReplyTo(null)} accessibilityLabel="Cancel reply" accessibilityRole="button">
               <Icon name="close" size={18} color={colors.textFaint} />
@@ -317,6 +369,15 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
               />
             ) : (
               <>
+                {isStaff && !profiles.get(actions.user_id)?.badge && (
+                  <Row
+                    icon="shield-checkmark-outline"
+                    title="Delete for everyone"
+                    subtitle={`Shows “${deletedLabel({ deleted_by_role: myRole })}” in its place`}
+                    danger
+                    onPress={() => staffDelete(actions)}
+                  />
+                )}
                 <Row icon="flag-outline" title="Report this message" onPress={() => { setFlag(actions); setActions(null); }} />
                 <Row
                   icon="ban"
@@ -342,6 +403,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: GUTTER, paddingBottom: spacing.sm, width: '100%', maxWidth: 760, alignSelf: 'center' },
   bubble: { borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   byline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  deleted: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1, minWidth: 0 },
   quote: { borderLeftWidth: 3, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: 6 },

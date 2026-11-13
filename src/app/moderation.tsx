@@ -125,6 +125,6 @@ async function loadTarget(f: Flag): Promise<Target> {
     const { data } = await supabase.from('report_comments').select('report_id,body,hidden').eq('id', f.target_id).maybeSingle();
     return data ? { text: data.body || '(photo)', hidden: data.hidden, reportId: data.report_id } : null;
   }
-  const { data } = await supabase.from('discussion_messages').select('body,hidden').eq('id', f.target_id).maybeSingle();
-  return data ? { text: data.body || '(photo or video)', hidden: data.hidden } : null;
+  const { data } = await supabase.from('discussion_messages').select('body,hidden,deleted_at').eq('id', f.target_id).maybeSingle();
+  return data ? { text: data.deleted_at ? '(deleted by staff)' : data.body || '(photo or video)', hidden: data.hidden } : null;
 }

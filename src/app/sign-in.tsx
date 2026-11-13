@@ -23,6 +23,7 @@ export default function SignIn() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
 
@@ -107,17 +108,29 @@ export default function SignIn() {
             textContentType="emailAddress"
             accessibilityLabel="Email"
           />
-          <TextInput
-            style={input}
-            placeholder="Password (8+ characters)"
-            placeholderTextColor={colors.textFaint}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
-            textContentType={mode === 'up' ? 'newPassword' : 'password'}
-            accessibilityLabel="Password"
-          />
+          <View style={styles.passwordWrap}>
+            <TextInput
+              style={[input, styles.passwordInput]}
+              placeholder="Password (8+ characters)"
+              placeholderTextColor={colors.textFaint}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
+              textContentType={mode === 'up' ? 'newPassword' : 'password'}
+              accessibilityLabel="Password"
+            />
+            <PressableScale
+              onPress={() => setShowPassword((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              hitSlop={8}
+              style={styles.eye}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.textMuted} />
+            </PressableScale>
+          </View>
           <Button
             title={mode === 'in' ? 'Sign in' : 'Create account'}
             loading={busy === 'email'}
@@ -180,4 +193,7 @@ const styles = StyleSheet.create({
   or: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.xl },
   line: { flex: 1, height: 1 },
   input: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: spacing.lg },
+  passwordWrap: { justifyContent: 'center' },
+  passwordInput: { paddingRight: 52 },
+  eye: { position: 'absolute', right: 6, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

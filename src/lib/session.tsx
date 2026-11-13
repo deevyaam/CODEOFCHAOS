@@ -54,7 +54,7 @@ type SessionState = {
   refreshProfile: () => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<string | null>;
   signUpEmail: (email: string, password: string, fullName: string) => Promise<string | null>;
-  signInOAuth: (provider: 'google' | 'facebook') => Promise<string | null>;
+  signInOAuth: (provider: 'google') => Promise<string | null>;
   signInGuest: () => Promise<string | null>;
   signOut: () => Promise<void>;
 };

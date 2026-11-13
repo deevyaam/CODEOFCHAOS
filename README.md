@@ -34,7 +34,7 @@ A community app for Mauritius: report local problems (safety, transport, health,
 
 1. Create a project. Copy its URL and **publishable** key into `.env`. Never put the service-role key in the app.
 2. SQL editor: run `supabase/schema.sql`, then `supabase/community.sql`.
-3. Authentication → Sign In / Providers: enable **Email**, **Anonymous sign-ins** (guest mode), **Google** and **Facebook** (each needs its own client id/secret from Google Cloud / Meta).
+3. Authentication → Sign In / Providers: enable **Email**, **Anonymous sign-ins** (guest mode), and **Google** (needs a client id/secret from Google Cloud).
 4. Authentication → URL configuration → Redirect URLs, add:
    - `lifepoweredbytech://auth-callback` (installed app)
    - `exp://**` (Expo Go during development)

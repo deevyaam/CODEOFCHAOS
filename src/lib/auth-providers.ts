@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, isSupabaseConfigured } from '@/config';
 
-export type Providers = { google: boolean; facebook: boolean; email: boolean; anonymous: boolean };
+export type Providers = { google: boolean; email: boolean; anonymous: boolean };
 
 let cache: Providers | null = null;
 
@@ -17,7 +17,6 @@ export async function fetchProviders(): Promise<Providers | null> {
     const j = (await res.json()) as { external?: Record<string, boolean> };
     cache = {
       google: !!j.external?.google,
-      facebook: !!j.external?.facebook,
       email: j.external?.email !== false,
       anonymous: !!j.external?.anonymous_users,
     };
@@ -40,4 +39,4 @@ export function useProviders() {
   return providers;
 }
 
-export const PROVIDER_NAME = { google: 'Google', facebook: 'Facebook' } as const;
+export const PROVIDER_NAME = { google: 'Google' } as const;

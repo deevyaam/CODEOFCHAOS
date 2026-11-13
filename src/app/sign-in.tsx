@@ -14,9 +14,8 @@ export default function SignIn() {
   const { signInEmail, signUpEmail, signInOAuth, signInGuest } = useSession();
   const { colors, type } = useTheme();
   const providers = useProviders();
-  // Hide buttons for providers that are switched off; show both if the check couldn't run.
+  // Hide the Google button if it's switched off in Supabase; show it if the check couldn't run.
   const showGoogle = providers?.google ?? true;
-  const showFacebook = providers?.facebook ?? true;
   const showGuest = providers?.anonymous ?? true;
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<'in' | 'up'>('in');
@@ -60,11 +59,10 @@ export default function SignIn() {
           </Notice>
         )}
 
-        {(showGoogle || showFacebook) && (
+        {showGoogle && (
           <>
             <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
-              {showGoogle && <SocialButton provider="google" busy={busy === 'google'} onPress={() => run('google', () => signInOAuth('google'))} />}
-              {showFacebook && <SocialButton provider="facebook" busy={busy === 'facebook'} onPress={() => run('facebook', () => signInOAuth('facebook'))} />}
+              <GoogleButton busy={busy === 'google'} onPress={() => run('google', () => signInOAuth('google'))} />
             </View>
 
             <View style={styles.or}>
@@ -169,9 +167,9 @@ export default function SignIn() {
   );
 }
 
-function SocialButton({ provider, onPress, busy }: { provider: 'google' | 'facebook'; onPress: () => void; busy: boolean }) {
+function GoogleButton({ onPress, busy }: { onPress: () => void; busy: boolean }) {
   const { colors, shadows } = useTheme();
-  const label = provider === 'google' ? 'Continue with Google' : 'Continue with Facebook';
+  const label = 'Continue with Google';
   return (
     <PressableScale
       onPress={onPress}
@@ -179,7 +177,7 @@ function SocialButton({ provider, onPress, busy }: { provider: 'google' | 'faceb
       accessibilityRole="button"
       accessibilityLabel={label}
       style={[styles.social, { backgroundColor: colors.surface, boxShadow: shadows.card }]}>
-      <Ionicons name={provider === 'google' ? 'logo-google' : 'logo-facebook'} size={20} color={provider === 'google' ? '#4285F4' : '#1877F2'} />
+      <Ionicons name="logo-google" size={20} color="#4285F4" />
       <Text variant="label" style={{ fontSize: 15 }}>{busy ? 'Opening…' : label}</Text>
     </PressableScale>
   );

@@ -29,7 +29,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
       {
         heading: 'What we collect',
         body: [
-          'Account: your email address, the name you give, and a profile picture, icon or initials if you choose one. If you sign in with Google or Facebook we receive your name and email from them.',
+          'Account: your email address, the name you give, and a profile picture, icon or initials if you choose one. If you sign in with Google we receive your name and email from Google.',
           'Guests: a random anonymous account id only. Guests can’t post, and guest assistant chats are not saved.',
           'Reports and comments: what you write, photos and videos you add, the category, and — only if you choose to attach it — the location you pin. You can post reports anonymously: your name is then not shown and not stored with the report.',
           'Discussion messages, reactions, “me too” votes, flags you send and people you block.',
@@ -51,7 +51,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
         body: [
           'Everyone using the app can see reports (without your name if anonymous), comments and, for members, the Discussion.',
           'If you send a report to an authority, the text and photos you send go to that authority through your own email or share option.',
-          'Service providers who process data for us: Supabase (database, storage and sign-in; data region {{DATA_REGION}}), Expo (push notifications), Open-Meteo (weather; receives the coordinates of the place you choose), Google and Facebook (only if you sign in with them), and map providers (Google Maps or Apple Maps on phones; OpenStreetMap and Esri on the web).',
+          'Service providers who process data for us: Supabase (database, storage and sign-in; data region {{DATA_REGION}}), Expo (push notifications), Open-Meteo (weather; receives the coordinates of the place you choose), Google (only if you sign in with Google), and map providers (Google Maps or Apple Maps on phones; OpenStreetMap and Esri on the web).',
           'The assistant runs on Gemma 3, an open AI model, on a server operated by {{OPERATOR_NAME}} or our hosting provider; your questions are sent to it to get an answer and are not used to train it.',
           'Some of these providers are outside Mauritius. We use them only with appropriate safeguards.',
           'We never sell your data.',

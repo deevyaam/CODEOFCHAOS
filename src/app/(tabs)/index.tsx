@@ -32,7 +32,7 @@ export default function Home() {
     {
       title: 'Your work',
       items: [
-        { title: 'New report', subtitle: 'Tell us about a problem near you', icon: 'add-circle', href: '/report/new' },
+        { title: 'Report a problem', subtitle: 'Something wrong near you? Tell people here', icon: 'add-circle', href: '/report/new' },
         { title: 'My reports', subtitle: 'Follow what happens to them', icon: 'folder-open', href: { pathname: '/reports', params: { mine: '1' } } },
         { title: 'Issues to handle', subtitle: 'Reports for your authority', icon: 'briefcase', href: '/issues', show: isStaff },
       ],

@@ -142,7 +142,7 @@ export default function Reports() {
         <PressableScale
           onPress={() => router.push('/report/new')}
           accessibilityRole="button"
-          accessibilityLabel="New report"
+          accessibilityLabel="Report a problem"
           style={[styles.fab, { bottom: tabSpace - spacing.sm, backgroundColor: colors.primary, boxShadow: shadows.float }]}>
           <Icon name="add" size={22} color={colors.onPrimary} />
           <Text variant="label" color={colors.onPrimary}>Report</Text>

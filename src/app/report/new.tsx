@@ -20,6 +20,7 @@ import { EMERGENCY_NUMBERS } from '@/config';
 import { nearestTown, TOWNS } from '@/lib/places';
 import { usePref } from '@/lib/prefs';
 import { useReadAloud } from '@/lib/read-aloud';
+import { clearReportDraft, peekReportDraft } from '@/lib/report-draft';
 import { ChoiceCard } from '@/components/choice-card';
 import {
   CATEGORIES,
@@ -101,11 +102,14 @@ export default function NewReport() {
   const reader = useReadAloud();
   const scroller = useRef<ScrollViewInstance>(null);
 
+  // A report drafted by the assistant, if the person came from there.
+  const [draft] = useState(peekReportDraft);
+  useEffect(() => clearReportDraft(), []);
   const [step, setStep] = useState(0);
-  const [category, setCategory] = useState<Category | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [media, setMedia] = useState<Picked[]>([]);
+  const [category, setCategory] = useState<Category | null>(draft?.category ?? null);
+  const [title, setTitle] = useState(draft?.title ?? '');
+  const [description, setDescription] = useState(draft?.description ?? '');
+  const [media, setMedia] = useState<Picked[]>(draft?.media ?? []);
   const [where, setWhere] = useState<Where | null>(null);
   const [locating, setLocating] = useState(false);
   const [point, setPoint] = useState<LatLng | null>(null);
@@ -295,6 +299,12 @@ export default function NewReport() {
               </Text>
             </PressableScale>
           </View>
+
+          {draft && step < 2 && (
+            <Notice icon="chatbubble-ellipses-outline">
+              <Text>The assistant filled this in from your chat{draft.media.length ? ', with your photos' : ''}. Check it and change anything that’s wrong. Nothing is sent until the last step.</Text>
+            </Notice>
+          )}
 
           {step === 0 && (
             <View style={{ gap: spacing.md }} accessibilityRole="radiogroup">

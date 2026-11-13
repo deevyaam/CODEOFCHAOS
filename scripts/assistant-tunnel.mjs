@@ -20,7 +20,7 @@ import { join } from 'node:path';
 const OLLAMA = process.env.OLLAMA_LOCAL_URL ?? 'http://127.0.0.1:11434';
 const MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:12b';
 const PORT = Number(process.env.OLLAMA_PROXY_PORT ?? 11435);
-const MAX_BODY = 512 * 1024;
+const MAX_BODY = 3 * 1024 * 1024; // room for a few photos
 const MAX_PER_MINUTE = 30;
 const KEY_FILE = '.ollama-proxy-key';
 
@@ -93,7 +93,7 @@ const server = http.createServer(async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(135_000),
     });
     res.writeHead(r.status, { 'Content-Type': 'application/json' });
     res.end(await r.text());

@@ -17,7 +17,7 @@ const cors = {
 };
 
 const LANGUAGES: ReplyLanguage[] = ['auto', 'mfe', 'fr', 'en'];
-const TIMEOUT_MS = 90_000;
+const TIMEOUT_MS = 140_000; // a cold start plus a photo can take over a minute on this PC
 
 const BUSY: Record<ReplyLanguage, string> = {
   auto: 'The assistant is unavailable right now. Please try again in a moment.',
@@ -26,7 +26,36 @@ const BUSY: Record<ReplyLanguage, string> = {
   mfe: 'Lasistan pa disponib pou lemoman. Reesey dan enn ti moman.',
 };
 
-type Turn = { role: 'user' | 'assistant'; content: string };
+type Turn = { role: 'user' | 'assistant'; content: string; images?: string[]; attachments?: number };
+type Draft = { category: 'safety' | 'transport' | 'health' | 'environment' | 'other'; title: string; description: string };
+
+const MAX_IMAGES = 3;
+const MAX_IMAGE_CHARS = 700_000; // ~500 KB of JPEG; the app sends ~100 KB per picture.
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const CATEGORIES = ['safety', 'transport', 'health', 'environment', 'other'];
+
+const DRAFT_READY: Record<'mfe' | 'fr' | 'en', string> = {
+  en: 'Here is a draft report. Check it, add where it is, then send it.',
+  fr: 'Voici un brouillon de signalement. Vérifiez-le, ajoutez le lieu, puis envoyez-le.',
+  mfe: 'Ala enn brouyon rapor. Verifie li, azout kot sa ete, apre avoy li.',
+};
+
+/** Pull the ```report {...}``` block out of the model's reply. */
+function takeDraft(reply: string): { text: string; draft: Draft | null } {
+  const m = reply.match(/```\s*report\s*([\s\S]*?)```/i) ?? reply.match(/```\s*json\s*(\{[\s\S]*?"category"[\s\S]*?\})\s*```/i);
+  if (!m) return { text: reply, draft: null };
+  const text = reply.replace(m[0], '').trim();
+  try {
+    const d = JSON.parse(m[1].trim()) as Partial<Draft>;
+    const category = CATEGORIES.includes(String(d.category)) ? (d.category as Draft['category']) : 'other';
+    const title = String(d.title ?? '').trim().slice(0, 80);
+    const description = String(d.description ?? '').trim().slice(0, 1000);
+    if (!title) return { text, draft: null };
+    return { text, draft: { category, title, description } };
+  } catch {
+    return { text, draft: null };
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -50,7 +79,11 @@ Deno.serve(async (req) => {
   const turns = (body.messages ?? [])
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
     .slice(-20)
-    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000), images: m.role === 'user' ? cleanImages(m.images) : [],
+      attachments: m.role === 'user' ? Math.min(Math.max(Number(m.attachments) || 0, 0), 10) : 0 }));
+  // Pictures go to the model only from the latest message that has them, to keep requests small.
+  const withImages = turns.map((t) => t.images.length > 0).lastIndexOf(true);
+  const modelTurns = turns.map((t, i) => (i === withImages ? { role: t.role, content: t.content, images: t.images } : { role: t.role, content: t.content }));
   if (!turns.length || turns[0].role !== 'user' || turns[turns.length - 1].role !== 'user') {
     return json({ error: 'The conversation must start and end with a user message' }, 400);
   }
@@ -79,7 +112,7 @@ Deno.serve(async (req) => {
         stream: false,
         keep_alive: '30m',
         options: { temperature: 0.3, num_ctx: 8192, num_predict: 700 },
-        messages: buildMessages(language, isGuest ? 'guest (read-only)' : 'signed-in member', appStatus, turns).messages,
+        messages: buildMessages(language, isGuest ? 'guest (read-only)' : 'signed-in member', appStatus, modelTurns).messages,
       }),
     });
     if (!res.ok) {
@@ -94,10 +127,19 @@ Deno.serve(async (req) => {
     return json({ error: busy }, 504);
   }
 
-  // Guests' chats are never saved.
+  const { text, draft } = takeDraft(reply);
+  reply = text || (draft ? DRAFT_READY[replyLanguage] : reply);
+
+  // Guests' chats are never saved. Pictures are never saved with a chat, only how many there were.
   let chatId = body.chatId ?? null;
   if (!isGuest) {
-    const all = [...turns, { role: 'assistant' as const, content: reply }];
+    const all = [
+      ...turns.map((t) => {
+        const n = Math.max(t.images.length, t.attachments);
+        return n ? { role: t.role, content: t.content, attachments: n } : { role: t.role, content: t.content };
+      }),
+      { role: 'assistant' as const, content: reply, ...(draft ? { draft } : {}) },
+    ];
     if (chatId) {
       await supabase.from('assistant_chats').update({ messages: all }).eq('id', chatId);
     } else {
@@ -110,8 +152,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({ reply, chatId, saved: !isGuest });
+  return json({ reply, draft, chatId, saved: !isGuest });
 });
+
+function cleanImages(images: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+  return images
+    .filter((x): x is string => typeof x === 'string')
+    .map((x) => x.replace(/^data:image\/[a-z]+;base64,/, ''))
+    .filter((x) => x.length > 0 && x.length <= MAX_IMAGE_CHARS && BASE64.test(x))
+    .slice(0, MAX_IMAGES);
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } });

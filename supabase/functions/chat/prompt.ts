@@ -6,7 +6,8 @@
 
 export type ReplyLanguage = 'auto' | 'mfe' | 'fr' | 'en';
 export type ResolvedLanguage = Exclude<ReplyLanguage, 'auto'>;
-export type ChatTurn = { role: 'user' | 'assistant'; content: string };
+/** images: base64 JPEGs (photos, or one still frame of a video) attached to a user turn. */
+export type ChatTurn = { role: 'user' | 'assistant'; content: string; images?: string[] };
 
 const NAMES: Record<ResolvedLanguage, string> = {
   mfe: 'Kreol Morisien (Mauritian Creole)',
@@ -55,6 +56,9 @@ export function resolveLanguage(chosen: ReplyLanguage, lastUserMessage: string):
   return chosen === 'auto' ? detectLanguage(lastUserMessage) : chosen;
 }
 
+/** Marks the start and end of a report draft in a reply (the chat function looks for it). */
+const FENCE = '```';
+
 const KREOL_GUIDE = `HOW TO WRITE KREOL MORISIEN:
 - Kreol Morisien is NOT French, NOT Haitian Creole and NOT Réunion Creole. Use the official spelling (Lortograf Kreol Morisien). Never use French words when a Kreol word exists.
 - Pronouns: mo (I), to / ou (you), li (he/she), nou (we), zot (you all/they). Verbs don't change: mo al, li al, nou al. Past: mo'nn al / mo finn al. Ongoing: mo pe al. Future: mo pou al. Negation: mo pa al.
@@ -66,7 +70,8 @@ const KREOL_GUIDE = `HOW TO WRITE KREOL MORISIEN:
 
 const APP_GUIDE = `WHERE THINGS ARE IN THE APP (use only these; never invent other screens or buttons):
 - Bottom tabs: Home, Map, Reports, Discuss, Assistant, Alerts. Swipe left/right to change tab.
-- New report: Reports tab → "Report" button (bottom right), or Home → "New report". 4 steps: type → details and photos/videos → pin on the map (optional) → when and where, with an "Post anonymously" switch.
+- New report: Reports tab → "Report a problem" button (bottom right), or Home → "Report a problem". 5 short steps: what kind of problem → what you see, with photos/videos → where it is (optional) → when, and whether to show your name → check and send.
+- In this chat, the photo button (left of the message box) attaches photos or videos so you can look at them.
 - My reports: Home → "My reports", or the "Mine" filter on the Reports tab.
 - A report's status (Reported, Sent to an authority, In progress, Fixed) and its timeline are on the report's page. The reporter, verified authorities and moderators can tap "Update status". Anyone can tap "Send to authority" to share it.
 - "Me too" is a button on each report card and report page. It adds you to "reported by N people" and you get updates on that report if notifications are on.
@@ -81,6 +86,21 @@ export function systemPrompt(reply: ResolvedLanguage, person: string, appStatus:
 REPLY LANGUAGE: ${NAMES[reply]} only. Every sentence of your answer must be in ${NAMES[reply]}. Do not mix in other languages, except the app's screen and button names, which stay in English as they appear on screen.
 ${reply === 'mfe' ? `\n${KREOL_GUIDE}\n` : ''}${reply === 'fr' ? '\nWrite natural French as spoken in Mauritius, using "vous".\n' : ''}
 ${APP_GUIDE}
+
+PHOTOS AND VIDEOS:
+- The person may attach photos. For a video you only see one still frame from it; say so if what they ask needs the whole video.
+- Describe only what you can actually see. If the picture is unclear, say so and ask. Never guess who someone is, and don't repeat number plates, faces' details, names or addresses you read in a picture.
+
+REPORT DRAFTS:
+- Write a draft ONLY when the person asks you to report, post or send the problem, or says yes after you offered. If they only ask what you see or ask a question, answer it and, if a photo shows a local problem, offer to draft a report — but do not write the draft yet.
+- When you do draft: one short line, then end your message with this block and nothing after it. Replace everything in <angle brackets> with your own words about THIS problem:
+${FENCE}report
+{"category":"<category>","title":"<title>","description":"<description>"}
+${FENCE}
+- category is one of: safety (feeling unsafe, dark streets, dangerous places, crime), transport (roads, potholes, pavements, buses, traffic lights), health (water supply, drains, sanitation, mosquitoes, clinics), environment (rubbish, dumping, pollution, flooding, beaches, trees), other.
+- title: what the problem is, at most 80 characters, in the reply language. description: 1–3 factual sentences from what they told you and what you can see. No blame, no names, no personal details.
+- Never say the report has been sent or posted: the person checks the draft, adds where it is, and sends it themselves.
+- If it isn't clear what the problem is, ask one short question instead of drafting.
 
 RULES:
 - Be brief, friendly and practical: a few short sentences or a short list. No greeting needed.
@@ -109,7 +129,7 @@ export function buildMessages(chosen: ReplyLanguage, person: string, appStatus: 
     messages: [
       { role: 'system', content: systemPrompt(reply, person, appStatus) },
       ...turns.slice(0, -1),
-      { role: 'user', content: `${last}\n\n${REMINDER[reply]}` },
+      { ...turns[turns.length - 1], role: 'user', content: `${last}\n\n${REMINDER[reply]}` },
     ],
   };
 }

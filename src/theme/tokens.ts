@@ -42,9 +42,9 @@ export const colors = {
     warningSoft: '#FFF2D6',
     success: '#2E7D32',
     successSoft: '#E5F3E6',
-    // Discuss bubbles for staff: moderators/admins (violet) and verified authorities (blue).
-    moderator: '#6A4BC4',
-    moderatorSoft: '#EFEAFB',
+    // Discuss bubbles for staff: moderators/admins (green) and verified authorities (blue).
+    moderator: '#2E7D32',
+    moderatorSoft: '#DDF2D6',
     authority: '#1D62B8',
     authoritySoft: '#E3EEFB',
     separator: 'rgba(15,27,34,0.08)',
@@ -71,8 +71,8 @@ export const colors = {
     warningSoft: 'rgba(245,180,81,0.14)',
     success: '#7BD389',
     successSoft: 'rgba(123,211,137,0.14)',
-    moderator: '#B9A5F7',
-    moderatorSoft: 'rgba(185,165,247,0.24)',
+    moderator: '#86D98A',
+    moderatorSoft: 'rgba(134,217,138,0.24)',
     authority: '#82B6F2',
     authoritySoft: 'rgba(130,182,242,0.24)',
     separator: 'rgba(238,243,244,0.08)',

@@ -31,7 +31,7 @@ type Reaction = { message_id: string; user_id: string; emoji: string };
 
 const PAGE = 100;
 
-/** Bubble colour by who wrote it: authorities blue, moderators/admins violet, everyone else plain (yours tinted). */
+/** Bubble colour by who wrote it: authorities blue, moderators/admins green, everyone else plain (yours tinted). */
 function bubbleTone(p: PublicProfile | undefined, mine: boolean, colors: Colors): { background: string; accent: string; icon: IconName | null } {
   if (p?.badge === 'authority') return { background: colors.authoritySoft, accent: colors.authority, icon: 'checkmark-circle' };
   if (p?.badge === 'moderator' || p?.badge === 'admin') return { background: colors.moderatorSoft, accent: colors.moderator, icon: 'shield-checkmark' };

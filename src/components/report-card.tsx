@@ -1,10 +1,12 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { categoryInfo, mediaUrl, statusInfo, timeAgo, type Report, type Status } from '@/lib/reports';
 import { daysOpen, isOverdue } from '@/lib/safety';
 import { radius, spacing, useTheme } from '@/theme';
+import { PRESS_SCALE, pressTiming } from '@/theme/motion';
 
 import { Icon, PressableScale, Text } from './ui';
 
@@ -70,13 +72,21 @@ export function ReportCard({
   const { colors, shadows } = useTheme();
   const cat = categoryInfo(report.category);
   const thumb = report.media.find((m) => m.type === 'image');
+  const scale = useSharedValue(1);
+  const pressed = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  // The whole card opens the report through a full-size Pressable *behind* the content, with "Me too" as a
+  // sibling on top. Nesting the Me too button inside the card's button is invalid HTML on web (<button> in <button>).
   return (
-    <PressableScale
-      onPress={() => router.push({ pathname: '/report/[id]', params: { id: report.id } })}
-      accessibilityRole="button"
-      accessibilityLabel={`${cat.label} report: ${report.title}`}
-      style={[styles.card, { backgroundColor: colors.surface, boxShadow: shadows.card }]}>
-      <View style={styles.top}>
+    <Animated.View style={[styles.card, { backgroundColor: colors.surface, boxShadow: shadows.card }, pressed]}>
+      <Pressable
+        onPress={() => router.push({ pathname: '/report/[id]', params: { id: report.id } })}
+        onPressIn={() => scale.set(withTiming(PRESS_SCALE, pressTiming))}
+        onPressOut={() => scale.set(withTiming(1, pressTiming))}
+        accessibilityRole="button"
+        accessibilityLabel={`${cat.label} report: ${report.title}`}
+        style={[StyleSheet.absoluteFill, { borderRadius: radius.lg }]}
+      />
+      <View style={[styles.top, styles.passThrough]}>
         <View style={[styles.catIcon, { backgroundColor: cat.color }]}>
           <Icon name={cat.icon} size={18} color="#fff" />
         </View>
@@ -89,10 +99,10 @@ export function ReportCard({
         {thumb && <Image source={{ uri: mediaUrl(thumb) }} style={styles.thumb} contentFit="cover" accessibilityIgnoresInvertColors />}
       </View>
       {report.description ? (
-        <Text variant="caption" muted numberOfLines={2}>{report.description}</Text>
+        <Text variant="caption" muted numberOfLines={2} style={styles.passThrough}>{report.description}</Text>
       ) : null}
-      <View style={styles.bottom}>
-        <View style={styles.meta}>
+      <View style={[styles.bottom, styles.boxNone]}>
+        <View style={[styles.meta, styles.passThrough]}>
           <StatusPill status={report.status} />
           {isOverdue(report) && (
             <View style={[styles.pill, { backgroundColor: colors.dangerSoft }]} accessibilityLabel={`Open for ${daysOpen(report)} days`}>
@@ -101,7 +111,7 @@ export function ReportCard({
             </View>
           )}
         </View>
-        <View style={styles.meta}>
+        <View style={[styles.meta, styles.boxNone]}>
           {report.comment_count > 0 && (
             <View style={styles.metaItem}>
               <Icon name="chatbubble-outline" size={14} color={colors.textMuted} />
@@ -112,14 +122,17 @@ export function ReportCard({
         </View>
       </View>
       {report.hidden && (
-        <Text variant="small" color={colors.danger}>Hidden by a moderator — only you and moderators can see it.</Text>
+        <Text variant="small" color={colors.danger} style={styles.passThrough}>Hidden by a moderator — only you and moderators can see it.</Text>
       )}
-    </PressableScale>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  // Content lets taps fall through to the card's Pressable; only Me too stays tappable.
+  passThrough: { pointerEvents: 'none' },
+  boxNone: { pointerEvents: 'box-none' },
   top: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   catIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   thumb: { width: 56, height: 56, borderRadius: radius.sm },

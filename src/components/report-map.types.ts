@@ -1,3 +1,4 @@
+import type { IconName } from '@/components/ui';
 import type { Report } from '@/lib/reports';
 import type { Zone } from '@/lib/safety';
 
@@ -13,7 +14,7 @@ export type ReportMapProps = {
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   /** Pick mode: tapping the map drops a single pin. */
-  pick?: { value: LatLng | null; color: string; onPick: (p: LatLng) => void };
+  pick?: { value: LatLng | null; color: string; icon?: IconName; onPick: (p: LatLng) => void };
   initial?: LatLng & { zoom?: number };
   /** Shaded circles drawn under the pins (safety heat, dark spots). */
   zones?: Zone[];

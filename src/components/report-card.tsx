@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { categoryInfo, mediaUrl, statusInfo, timeAgo, type Report, type Status } from '@/lib/reports';
+import { categoryInfo, mediaUrl, pinOf, statusInfo, timeAgo, type Report, type Status } from '@/lib/reports';
 import { daysOpen, isOverdue } from '@/lib/safety';
 import { radius, spacing, useTheme } from '@/theme';
 import { PRESS_SCALE, pressTiming } from '@/theme/motion';
@@ -71,6 +71,7 @@ export function ReportCard({
 }) {
   const { colors, shadows } = useTheme();
   const cat = categoryInfo(report.category);
+  const pin = pinOf(report);
   const thumb = report.media.find((m) => m.type === 'image');
   const scale = useSharedValue(1);
   const pressed = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -83,12 +84,12 @@ export function ReportCard({
         onPressIn={() => scale.set(withTiming(PRESS_SCALE, pressTiming))}
         onPressOut={() => scale.set(withTiming(1, pressTiming))}
         accessibilityRole="button"
-        accessibilityLabel={`${cat.label} report: ${report.title}`}
+        accessibilityLabel={`${cat.label} report, ${pin.label}: ${report.title}`}
         style={[StyleSheet.absoluteFill, { borderRadius: radius.lg }]}
       />
       <View style={[styles.top, styles.passThrough]}>
-        <View style={[styles.catIcon, { backgroundColor: cat.color }]}>
-          <Icon name={cat.icon} size={18} color="#fff" />
+        <View style={[styles.catIcon, { backgroundColor: pin.color }]}>
+          <Icon name={pin.icon} size={18} color="#fff" />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="bodyStrong" numberOfLines={2}>{report.title}</Text>

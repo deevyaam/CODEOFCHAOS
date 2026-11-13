@@ -1,14 +1,14 @@
 // Phones: react-native-maps (Google Maps on Android, Apple Maps on iOS).
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import MapView, { Circle, Marker, type MapPressEvent } from 'react-native-maps';
 
-import { categoryInfo } from '@/lib/reports';
+import { pinOf } from '@/lib/reports';
 import { MAURITIUS_CENTER } from '@/lib/places';
 import { useTheme } from '@/theme';
 
 import type { ReportMapHandle, ReportMapProps } from './report-map.types';
-import { Icon, type IconName } from './ui';
+import { MapPin } from './map-pin';
 
 const zoomToDelta = (zoom: number) => 360 / 2 ** zoom;
 
@@ -70,17 +70,19 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
                 e.stopPropagation();
                 onSelect?.(r.id);
               }}
+              anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={false}
-              accessibilityLabel={r.title}>
-              <Pin color={r.pin_color ?? categoryInfo(r.category).color} icon={(r.pin_icon as IconName) ?? categoryInfo(r.category).icon} selected={r.id === selectedId} />
+              accessibilityLabel={`${pinOf(r).label}: ${r.title}`}>
+              <MapPin {...pinOf(r)} size={r.id === selectedId ? 40 : 30} />
             </Marker>
           ))}
       {pick?.value && (
         <Marker
           coordinate={{ latitude: pick.value.lat, longitude: pick.value.lng }}
           draggable
+          anchor={{ x: 0.5, y: 1 }}
           onDragEnd={(e) => pick.onPick({ lat: e.nativeEvent.coordinate.latitude, lng: e.nativeEvent.coordinate.longitude })}>
-          <Pin color={pick.color} icon="location" selected />
+          <MapPin color={pick.color} icon={pick.icon ?? 'location'} size={40} />
         </Marker>
       )}
     </MapView>
@@ -92,21 +94,3 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-function Pin({ color, icon, selected }: { color: string; icon: IconName; selected?: boolean }) {
-  const size = selected ? 40 : 32;
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: color,
-        borderWidth: 3,
-        borderColor: '#fff',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <Icon name={icon} size={size * 0.5} color="#fff" />
-    </View>
-  );
-}

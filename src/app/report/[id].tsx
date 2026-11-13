@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authenticate } from '@/components/app-lock';
 import { Avatar } from '@/components/avatar';
 import { FlagSheet, ReactionBar } from '@/components/community';
+import { MapPin } from '@/components/map-pin';
 import { StackHeader } from '@/components/layout';
 import { MediaStrip } from '@/components/media-view';
 import { MeTooButton, StatusPill } from '@/components/report-card';
@@ -31,6 +32,7 @@ import { badgeLabel, useProfiles } from '@/lib/profiles';
 import {
   STATUSES,
   categoryInfo,
+  pinOf,
   mediaUrl,
   statusInfo,
   timeAgo,
@@ -203,6 +205,7 @@ export default function ReportDetail() {
   }
 
   const cat = categoryInfo(report.category);
+  const pin = pinOf(report);
   const author = report.author_id ? profiles.get(report.author_id) : null;
   const authorName = report.is_anonymous ? 'Anonymous' : author?.full_name || 'A member';
   const currentIdx = STATUSES.findIndex((s) => s.value === report.status);
@@ -219,6 +222,10 @@ export default function ReportDetail() {
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={{ gap: spacing.sm }}>
+          <View style={styles.pinRow}>
+            <MapPin color={pin.color} icon={pin.icon} size={26} />
+            <Text variant="label" color={pin.color === '#E3A008' ? colors.text : pin.color}>{pin.label}</Text>
+          </View>
           <Text variant="title">{report.title}</Text>
           <View style={styles.byline}>
             {report.is_anonymous ? (
@@ -438,6 +445,7 @@ function TimelineItem({ icon, title, subtitle, when }: { icon: Parameters<typeof
 }
 
 const styles = StyleSheet.create({
+  pinRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   content: { paddingHorizontal: GUTTER, paddingBottom: spacing.xxl, gap: spacing.lg, width: '100%', maxWidth: 760, alignSelf: 'center' },
   byline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   anon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

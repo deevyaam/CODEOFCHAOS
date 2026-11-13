@@ -22,10 +22,14 @@ import { usePref } from '@/lib/prefs';
 import { useReadAloud } from '@/lib/read-aloud';
 import { clearReportDraft, peekReportDraft } from '@/lib/report-draft';
 import { ChoiceCard } from '@/components/choice-card';
+import { MapPin } from '@/components/map-pin';
+import { Sheet } from '@/components/sheet';
 import {
   CATEGORIES,
+  EXAMPLE_ICON,
+  ISSUE_ICONS,
   PIN_COLORS,
-  PIN_ICONS,
+  pinOf,
   setMeToo,
   timeAgo,
   uploadMedia,
@@ -113,9 +117,9 @@ export default function NewReport() {
   const [where, setWhere] = useState<Where | null>(null);
   const [locating, setLocating] = useState(false);
   const [point, setPoint] = useState<LatLng | null>(null);
-  const [showPinLook, setShowPinLook] = useState(false);
+  const [pinSheet, setPinSheet] = useState(false);
   const [pinColor, setPinColor] = useState<string | null>(null);
-  const [pinIcon, setPinIcon] = useState<string | null>(null);
+  const [pinIcon, setPinIcon] = useState<IconName | null>(null);
   const [when, setWhen] = useState(0);
   // undefined = suggest the nearest town to the pin; null = none chosen.
   const [townChoice, setTown] = useState<string | null | undefined>(undefined);
@@ -129,6 +133,10 @@ export default function NewReport() {
   const cat = category ? CATEGORIES.find((c) => c.value === category) ?? null : null;
   const plain = category ? PLAIN[category] : null;
   const color = pinColor ?? cat?.color ?? colors.primary;
+  // Like a traffic app: the pin's picture follows the problem (a tapped example), unless the person picks one.
+  const autoIcon = category ? (EXAMPLE_ICON[title] ?? ISSUE_ICONS[category][0].icon) : null;
+  const icon = pinIcon ?? autoIcon;
+  const pin = category ? pinOf({ category, pin_color: color, pin_icon: icon }) : null;
   const sharePlace = where === 'here' || where === 'map';
   const town = townChoice === undefined ? (point && sharePlace ? nearestTown(point).name : null) : townChoice;
 
@@ -241,8 +249,8 @@ export default function NewReport() {
           place_name: place.trim() || null,
           occurred_at: w.hours >= 0 ? new Date(Date.now() - w.hours * 3600_000).toISOString() : null,
           is_anonymous: anonymous,
-          pin_color: sharePlace ? pinColor : null,
-          pin_icon: sharePlace ? pinIcon : null,
+          pin_color: pinColor,
+          pin_icon: icon,
           media: uploaded,
         })
         .select('id')
@@ -317,7 +325,10 @@ export default function NewReport() {
                   hint={PLAIN[c.value].hint}
                   selected={category === c.value}
                   onPress={() => {
-                    if (category !== c.value) setTitle('');
+                    if (category !== c.value) {
+                        setTitle('');
+                        setPinIcon(null);
+                      }
                     setCategory(c.value);
                     setHint(null);
                   }}
@@ -408,6 +419,23 @@ export default function NewReport() {
                 )}
                 <Text variant="caption" muted>Try not to show people’s faces or car number plates.</Text>
               </View>
+              {pin && (
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="label">Map pin <Text variant="label" muted>(you can change it)</Text></Text>
+                  <PressableScale
+                    onPress={() => setPinSheet(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Map pin: ${pin.label}. Change the picture or colour`}
+                    style={[styles.pinCard, { backgroundColor: colors.surface, borderColor: colors.separator }]}>
+                    <MapPin color={pin.color} icon={pin.icon} size={34} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodyStrong">{pin.label}</Text>
+                      <Text variant="caption" muted>This is how your report shows on the map.</Text>
+                    </View>
+                    <Text variant="label" color={colors.primary}>Change</Text>
+                  </PressableScale>
+                </View>
+              )}
             </>
           )}
 
@@ -443,6 +471,7 @@ export default function NewReport() {
                       pick={{
                         value: point,
                         color,
+                        icon: icon ?? undefined,
                         onPick: (p) => {
                           setPoint(p);
                           setHint(null);
@@ -460,47 +489,6 @@ export default function NewReport() {
                     maxLength={160}
                     accessibilityLabel="Nearby place or landmark, optional"
                   />
-                  <PressableScale
-                    onPress={() => setShowPinLook((v) => !v)}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: showPinLook }}
-                    style={styles.disclosure}>
-                    <Icon name={showPinLook ? 'chevron-down' : 'chevron-forward'} size={18} color={colors.primary} />
-                    <Text variant="label" color={colors.primary}>Change how the pin looks (you can skip this)</Text>
-                  </PressableScale>
-                  {showPinLook && (
-                    <View style={{ gap: spacing.sm }}>
-                      <View style={styles.wrap}>
-                        {PIN_COLORS.map((c) => (
-                          <PressableScale
-                            key={c}
-                            onPress={() => setPinColor(c)}
-                            accessibilityRole="radio"
-                            accessibilityState={{ checked: color === c }}
-                            accessibilityLabel={`Pin colour ${c}`}
-                            style={[styles.swatch, { backgroundColor: c }]}>
-                            {color === c && <Icon name="checkmark" size={18} color="#fff" />}
-                          </PressableScale>
-                        ))}
-                      </View>
-                      <View style={styles.wrap}>
-                        {PIN_ICONS.map((ic) => {
-                          const on = (pinIcon ?? cat?.icon) === ic;
-                          return (
-                            <PressableScale
-                              key={ic}
-                              onPress={() => setPinIcon(ic)}
-                              accessibilityRole="radio"
-                              accessibilityState={{ checked: on }}
-                              accessibilityLabel={`Pin picture ${ic}`}
-                              style={[styles.swatch, { backgroundColor: on ? color : colors.surfaceMuted }]}>
-                              <Icon name={ic} size={20} color={on ? '#fff' : colors.textMuted} />
-                            </PressableScale>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  )}
                 </>
               )}
 
@@ -569,6 +557,7 @@ export default function NewReport() {
             <>
               <Card padded={false} style={{ paddingHorizontal: spacing.lg }}>
                 <ReviewRow icon={cat.icon} iconBg={cat.color} label="The problem" value={`${title.trim()}\n${plain.label}`} onChange={() => goTo(1)} />
+                {pin && <ReviewRow icon={pin.icon} iconBg={pin.color} label="Map pin" value={pin.label} onChange={() => { goTo(1); setPinSheet(true); }} />}
                 <ReviewRow icon="images" label="Photos" value={media.length ? `${media.length} added` : 'None'} onChange={() => goTo(1)} />
                 <ReviewRow icon="location" label="Place" value={placeLabel} onChange={() => goTo(2)} />
                 <ReviewRow icon="time" label="When" value={whenLabel} onChange={() => goTo(3)} />
@@ -611,6 +600,69 @@ export default function NewReport() {
           <Button title="Send report" icon="send" haptic loading={busy} onPress={submit} style={{ flex: 2 }} />
         )}
       </View>
+      {category && pin && (
+        <Sheet visible={pinSheet} onClose={() => setPinSheet(false)} title="Map pin">
+          <View style={{ gap: spacing.lg }}>
+            <View style={[styles.pinPreview, { backgroundColor: colors.surfaceMuted }]}>
+              <MapPin color={pin.color} icon={pin.icon} size={52} label={`Preview: ${pin.label}`} />
+              <Text variant="bodyStrong">{pin.label}</Text>
+            </View>
+            <View style={{ gap: spacing.sm }} accessibilityRole="radiogroup" accessibilityLabel="Picture">
+              <Text variant="label">Picture</Text>
+              {chunk(ISSUE_ICONS[category], 4).map((row, ri) => (
+                <View key={ri} style={styles.iconRow}>
+                  {row.map((x) => {
+                    if (!x) return <View key={`gap${ri}`} style={{ flex: 1 }} />;
+                    const on = icon === x.icon;
+                    return (
+                      <PressableScale
+                        key={x.icon + x.label}
+                        onPress={() => setPinIcon(x.icon)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: on }}
+                        accessibilityLabel={x.label}
+                        style={[styles.iconChoice, { backgroundColor: on ? colors.primarySoft : 'transparent', borderColor: on ? colors.primary : colors.separator }]}>
+                        <View style={[styles.iconDot, { backgroundColor: on ? pin.color : colors.surfaceMuted }]}>
+                          <Icon name={x.icon} size={22} color={on ? '#fff' : colors.textMuted} />
+                        </View>
+                        <Text variant="small" numberOfLines={2} style={{ textAlign: 'center' }}>{x.label}</Text>
+                      </PressableScale>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+            <View style={{ gap: spacing.sm }} accessibilityRole="radiogroup" accessibilityLabel="Colour">
+              <Text variant="label">Colour</Text>
+              <View style={styles.wrap}>
+                {PIN_COLORS.map((c) => (
+                  <PressableScale
+                    key={c}
+                    onPress={() => setPinColor(c)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: color === c }}
+                    accessibilityLabel={`Colour ${COLOR_NAME[c] ?? c}`}
+                    style={[styles.swatch, { backgroundColor: c }]}>
+                    {color === c && <Icon name="checkmark" size={18} color="#fff" />}
+                  </PressableScale>
+                ))}
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Button
+                kind="secondary"
+                title="Reset"
+                onPress={() => {
+                  setPinIcon(null);
+                  setPinColor(null);
+                }}
+                style={{ flex: 1 }}
+              />
+              <Button title="Done" icon="checkmark" onPress={() => setPinSheet(false)} style={{ flex: 1 }} />
+            </View>
+          </View>
+        </Sheet>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -659,7 +711,30 @@ function NextLine({ n, text }: { n: number; text: string }) {
   );
 }
 
+/** Split a list into rows of n, padding the last row so every cell keeps the same width. */
+function chunk<T>(items: T[], n: number): (T | null)[][] {
+  const rows: (T | null)[][] = [];
+  for (let i = 0; i < items.length; i += n) rows.push([...items.slice(i, i + n), ...Array(Math.max(0, i + n - items.length)).fill(null)]);
+  return rows;
+}
+
+const COLOR_NAME: Record<string, string> = {
+  '#D64545': 'red',
+  '#E8664A': 'orange',
+  '#E3A008': 'yellow',
+  '#2E9D5B': 'green',
+  '#0E7C74': 'teal',
+  '#2F6FDB': 'blue',
+  '#7A5AF8': 'purple',
+  '#6B7A86': 'grey',
+};
+
 const styles = StyleSheet.create({
+  pinCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, minHeight: 64 },
+  pinPreview: { alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: radius.md },
+  iconRow: { flexDirection: 'row', gap: spacing.xs },
+  iconChoice: { flex: 1, minWidth: 0, alignItems: 'center', gap: 4, paddingVertical: spacing.sm, paddingHorizontal: 2, borderRadius: radius.md, borderWidth: 1 },
+  iconDot: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   progressWrap: { paddingHorizontal: GUTTER, paddingBottom: spacing.lg, gap: spacing.sm, width: '100%', maxWidth: 760, alignSelf: 'center' },
   progress: { flexDirection: 'row', gap: spacing.xs },
   bar: { flex: 1, height: 6, borderRadius: 3 },

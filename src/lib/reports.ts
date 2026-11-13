@@ -62,9 +62,95 @@ export const STATUSES: { value: Status; label: string; icon: IconName }[] = [
 ];
 
 export const PIN_COLORS = ['#D64545', '#E8664A', '#E3A008', '#2E9D5B', '#0E7C74', '#2F6FDB', '#7A5AF8', '#6B7A86'];
-export const PIN_ICONS: IconName[] = [
-  'warning', 'flash', 'water', 'trash', 'car', 'bus', 'bulb', 'construct', 'leaf', 'medkit', 'home', 'paw',
-];
+
+/** Map pictures for each kind of problem, like a traffic app's report icons. The first one is the default. */
+export const ISSUE_ICONS: Record<Category, { icon: IconName; label: string }[]> = {
+  safety: [
+    { icon: 'bulb', label: 'Street light out' },
+    { icon: 'moon', label: 'Dark spot' },
+    { icon: 'warning', label: 'Danger' },
+    { icon: 'eye-off', label: 'Hidden corner' },
+    { icon: 'paw', label: 'Stray dogs' },
+    { icon: 'flame', label: 'Fire risk' },
+    { icon: 'hand-left', label: 'Harassment' },
+    { icon: 'walk', label: 'Unsafe crossing' },
+  ],
+  transport: [
+    { icon: 'ellipse', label: 'Pothole' },
+    { icon: 'car', label: 'Accident' },
+    { icon: 'construct', label: 'Roadworks' },
+    { icon: 'stop-circle', label: 'Traffic light out' },
+    { icon: 'bus', label: 'Bus problem' },
+    { icon: 'walk', label: 'Footpath blocked' },
+    { icon: 'trail-sign', label: 'Missing sign' },
+    { icon: 'bicycle', label: 'Cycle path' },
+  ],
+  health: [
+    { icon: 'water', label: 'No water' },
+    { icon: 'beaker', label: 'Dirty water' },
+    { icon: 'funnel', label: 'Blocked drain' },
+    { icon: 'bug', label: 'Mosquitoes' },
+    { icon: 'trash', label: 'Unhygienic' },
+    { icon: 'thermometer', label: 'Health risk' },
+    { icon: 'medkit', label: 'Clinic' },
+  ],
+  environment: [
+    { icon: 'trash', label: 'Rubbish' },
+    { icon: 'rainy', label: 'Flooding' },
+    { icon: 'leaf', label: 'Fallen tree' },
+    { icon: 'boat', label: 'Dirty beach' },
+    { icon: 'flame', label: 'Burning' },
+    { icon: 'cloud', label: 'Smoke or smell' },
+    { icon: 'fish', label: 'Polluted water' },
+    { icon: 'flower', label: 'Green space' },
+  ],
+  other: [
+    { icon: 'volume-high', label: 'Noise' },
+    { icon: 'football', label: 'Playground' },
+    { icon: 'car', label: 'Abandoned car' },
+    { icon: 'flash', label: 'Power cut' },
+    { icon: 'wifi', label: 'No signal' },
+    { icon: 'home', label: 'Building' },
+    { icon: 'school', label: 'School' },
+    { icon: 'help-circle', label: 'Something else' },
+  ],
+};
+
+/** The picture a reporter would most likely pick for each tap-to-fill example. */
+export const EXAMPLE_ICON: Record<string, IconName> = {
+  'Street light not working': 'bulb',
+  'Dark, unsafe spot at night': 'moon',
+  'Broken wall or fence': 'warning',
+  'Stray dogs': 'paw',
+  'Hole in the road': 'ellipse',
+  'Bus did not come': 'bus',
+  'Traffic light not working': 'stop-circle',
+  'Footpath blocked': 'walk',
+  'No running water': 'water',
+  'Dirty water from the tap': 'beaker',
+  'Blocked drain': 'funnel',
+  'Lots of mosquitoes': 'bug',
+  'Rubbish not collected': 'trash',
+  Flooding: 'rainy',
+  'Fallen tree': 'leaf',
+  'Dirty beach': 'boat',
+  'Too much noise': 'volume-high',
+  'Broken playground or bench': 'football',
+  'Abandoned car': 'car',
+};
+
+/** Every picture a pin may use (older reports used some of these general ones). */
+const LEGACY_ICONS: IconName[] = ['warning', 'flash', 'water', 'trash', 'car', 'bus', 'bulb', 'construct', 'leaf', 'medkit', 'home', 'paw'];
+const ICON_LABEL = new Map<string, string>();
+Object.values(ISSUE_ICONS).flat().forEach((x) => !ICON_LABEL.has(x.icon) && ICON_LABEL.set(x.icon, x.label));
+export const PIN_ICONS: IconName[] = [...new Set([...Object.values(ISSUE_ICONS).flat().map((x) => x.icon), ...LEGACY_ICONS])];
+
+/** Colour, picture and name a report shows on maps and cards: the reporter's choice, or its type's defaults. */
+export function pinOf(r: { category: Category; pin_color?: string | null; pin_icon?: string | null }) {
+  const cat = categoryInfo(r.category);
+  const icon = r.pin_icon && (PIN_ICONS as string[]).includes(r.pin_icon) ? (r.pin_icon as IconName) : cat.icon;
+  return { color: r.pin_color ?? cat.color, icon, label: ICON_LABEL.get(icon) ?? cat.label };
+}
 
 export const categoryInfo = (c: Category) => CATEGORIES.find((x) => x.value === c) ?? CATEGORIES[4];
 export const statusInfo = (s: Status) => STATUSES.find((x) => x.value === s) ?? STATUSES[0];

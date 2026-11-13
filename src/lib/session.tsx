@@ -1,4 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js';
+import { isRunningInExpoGo } from 'expo';
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -59,10 +61,19 @@ type SessionState = {
 
 const Ctx = createContext<SessionState | null>(null);
 
+/**
+ * Where sign-in (Google, email links) returns to. Each one must be in Supabase → Authentication → URL Configuration:
+ *   web: <origin>/auth-callback · Expo Go: exp(s)://<dev server>/--/auth-callback · app builds: lifepoweredbytech://auth-callback
+ */
 export function oauthRedirectUrl() {
-  return Platform.OS === 'web' && typeof window !== 'undefined'
-    ? `${window.location.origin}/auth-callback`
-    : Linking.createURL('/auth-callback');
+  if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/auth-callback`;
+  if (isRunningInExpoGo()) {
+    // Expo Go can only be reopened through the exp:// (or exps:// for a tunnel) address it loaded the app from.
+    // Build it from that address directly: Linking.createURL can fall back to the app's own scheme, which Expo Go can't receive.
+    const base = Constants.linkingUri?.match(/^(exps?:\/\/[^/]+)/)?.[1] ?? (Constants.expoConfig?.hostUri ? `exps://${Constants.expoConfig.hostUri}` : null);
+    if (base) return `${base}/--/auth-callback`;
+  }
+  return Linking.createURL('auth-callback');
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {

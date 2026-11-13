@@ -10,11 +10,11 @@ export const isSupabaseConfigured =
   /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(SUPABASE_URL) && SUPABASE_PUBLISHABLE_KEY.length > 20;
 
 /** Contact address shown in About, legal pages and "report a problem". */
-export const CONTACT_EMAIL = '<YOUR_CONTACT_EMAIL>';
+export const CONTACT_EMAIL = 'deevyaam18@gmail.com';
 /** Who runs the service (data controller), shown in the legal notice. */
-export const OPERATOR_NAME = '<YOUR_NAME_AND_TEAM>';
+export const OPERATOR_NAME = 'Deevyaam Sydanna';
 /** Region of the Supabase project (shown in the privacy policy), e.g. "EU (Frankfurt)". */
-export const DATA_REGION = '<YOUR_SUPABASE_REGION>';
+export const DATA_REGION = 'European Union (Ireland, eu-west-1)';
 
 /** Values substituted into src/content/legal.ts. */
 export const LEGAL_TOKENS: Record<string, string> = {

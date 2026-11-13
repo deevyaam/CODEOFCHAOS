@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { categoryInfo, mediaUrl, statusInfo, timeAgo, type Report, type Status } from '@/lib/reports';
+import { daysOpen, isOverdue } from '@/lib/safety';
 import { radius, spacing, useTheme } from '@/theme';
 
 import { Icon, PressableScale, Text } from './ui';
@@ -91,7 +92,15 @@ export function ReportCard({
         <Text variant="caption" muted numberOfLines={2}>{report.description}</Text>
       ) : null}
       <View style={styles.bottom}>
-        <StatusPill status={report.status} />
+        <View style={styles.meta}>
+          <StatusPill status={report.status} />
+          {isOverdue(report) && (
+            <View style={[styles.pill, { backgroundColor: colors.dangerSoft }]} accessibilityLabel={`Open for ${daysOpen(report)} days`}>
+              <Icon name="time-outline" size={13} color={colors.danger} />
+              <Text variant="small" color={colors.danger} style={{ fontWeight: '600' }}>Open {daysOpen(report)} days</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.meta}>
           {report.comment_count > 0 && (
             <View style={styles.metaItem}>

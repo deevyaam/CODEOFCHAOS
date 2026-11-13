@@ -59,9 +59,13 @@ export function PressableScale({
 }) {
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  // Placement (absolute position, flex, margins) belongs on the outer Pressable; the look stays on the
+  // animated inner view. Otherwise an absolutely positioned button is placed relative to a zero-size wrapper.
+  const { outer, inner } = splitStyle(style);
   return (
     <Pressable
       {...rest}
+      style={outer}
       disabled={disabled}
       onPressIn={(e) => {
         scale.set(withTiming(PRESS_SCALE, pressTiming));
@@ -75,9 +79,25 @@ export function PressableScale({
         if (haptic && Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         onPress?.(e);
       }}>
-      <Animated.View style={[style, animated, disabled && { opacity: 0.5 }]}>{children}</Animated.View>
+      <Animated.View style={[inner, animated, disabled && { opacity: 0.5 }]}>{children}</Animated.View>
     </Pressable>
   );
+}
+
+const OUTER_KEYS = new Set([
+  'position', 'top', 'right', 'bottom', 'left', 'start', 'end', 'zIndex', 'alignSelf',
+  'flex', 'flexGrow', 'flexShrink', 'flexBasis',
+  'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'marginHorizontal', 'marginVertical', 'marginStart', 'marginEnd',
+]);
+
+function splitStyle(style: StyleProp<ViewStyle>) {
+  const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
+  const outer: Record<string, unknown> = {};
+  const inner: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(flat)) (OUTER_KEYS.has(k) ? outer : inner)[k] = v;
+  // When the wrapper grows, the visible part grows with it.
+  if (outer.flex != null || outer.flexGrow != null) inner.flexGrow = 1;
+  return { outer: outer as ViewStyle, inner: inner as ViewStyle };
 }
 
 export function Card({ children, style, padded = true }: { children: ReactNode; style?: StyleProp<ViewStyle>; padded?: boolean }) {

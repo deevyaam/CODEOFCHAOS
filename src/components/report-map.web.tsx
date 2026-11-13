@@ -16,6 +16,7 @@ function html(dark: boolean, start: { lat: number; lng: number; zoom: number }, 
 html,body,#map{height:100%;margin:0;background:${dark ? '#0B1418' : '#E9EEF0'}}
 .pin{width:30px;height:30px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.25);box-sizing:border-box}
 .pin.sel{width:40px;height:40px}
+.leaflet-top{top:120px}
 .me{width:18px;height:18px;border-radius:50%;background:#2F6FDB;border:3px solid #fff;box-shadow:0 0 0 6px rgba(47,111,219,.25);box-sizing:border-box}
 ${dark ? '.leaflet-tile-pane .street{filter:invert(.92) hue-rotate(180deg) brightness(.9) contrast(.9)}' : ''}
 </style></head><body><div id="map"></div>
@@ -27,7 +28,7 @@ const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Worl
 street.addTo(map);
 ${layers ? "L.control.layers({'Map':street,'Satellite':sat},null,{position:'topright'}).addTo(map);" : ''}
 L.control.zoom({position:'topright'}).addTo(map);
-let markers=L.layerGroup().addTo(map), me=null, pickMarker=null, pickMode=false;
+let zones=L.layerGroup().addTo(map), markers=L.layerGroup().addTo(map), me=null, pickMarker=null, pickMode=false;
 const send=(m)=>parent.postMessage(Object.assign({__lpt:true},m),'*');
 map.on('click',e=>{ if(pickMode) send({type:'pick',lat:e.latlng.lat,lng:e.latlng.lng}); else send({type:'select',id:null}); });
 window.addEventListener('message',e=>{
@@ -35,6 +36,9 @@ window.addEventListener('message',e=>{
   if(m.type==='reports'){ markers.clearLayers(); m.items.forEach(r=>{
     const icon=L.divIcon({className:'',html:'<div class="pin'+(r.sel?' sel':'')+'" style="background:'+r.color+'"></div>',iconSize:r.sel?[40,40]:[30,30]});
     L.marker([r.lat,r.lng],{icon,title:r.title,keyboard:true}).on('click',ev=>{L.DomEvent.stopPropagation(ev);send({type:'select',id:r.id});}).addTo(markers);
+  }); }
+  if(m.type==='zones'){ zones.clearLayers(); m.items.forEach(z=>{
+    L.circle([z.lat,z.lng],{radius:z.radius,color:z.color,weight:1,opacity:Math.min(1,z.opacity+0.3),fillColor:z.color,fillOpacity:z.opacity,interactive:true}).bindTooltip(z.label).addTo(zones);
   }); }
   if(m.type==='me'){ if(me) me.remove(); if(m.lat!=null) me=L.marker([m.lat,m.lng],{icon:L.divIcon({className:'',html:'<div class="me" title="You are here"></div>',iconSize:[18,18]})}).addTo(map); }
   if(m.type==='center'){ map.flyTo([m.lat,m.lng],m.zoom,{duration:m.instant?0:0.35}); }
@@ -45,7 +49,7 @@ send({type:'ready'});
 }
 
 export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function ReportMap(
-  { reports = [], me, selectedId, onSelect, pick, initial, layers = true },
+  { reports = [], zones = [], me, selectedId, onSelect, pick, initial, layers = true },
   ref,
 ) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -82,6 +86,10 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
         .map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, title: r.title, color: r.pin_color ?? categoryInfo(r.category).color, sel: r.id === selectedId })),
     });
   }, [ready, reports, selectedId]);
+
+  useEffect(() => {
+    if (ready) post({ type: 'zones', items: zones });
+  }, [ready, zones]);
 
   useEffect(() => {
     if (ready) post({ type: 'me', lat: me?.lat ?? null, lng: me?.lng ?? null });

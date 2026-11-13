@@ -1,4 +1,5 @@
 import type { Report } from '@/lib/reports';
+import type { Zone } from '@/lib/safety';
 
 export type LatLng = { lat: number; lng: number };
 
@@ -14,6 +15,8 @@ export type ReportMapProps = {
   /** Pick mode: tapping the map drops a single pin. */
   pick?: { value: LatLng | null; color: string; onPick: (p: LatLng) => void };
   initial?: LatLng & { zoom?: number };
+  /** Shaded circles drawn under the pins (safety heat, dark spots). */
+  zones?: Zone[];
   /** Web only: show the satellite layer switch. */
   layers?: boolean;
 };

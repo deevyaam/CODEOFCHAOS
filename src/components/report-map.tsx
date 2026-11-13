@@ -1,7 +1,7 @@
 // Phones: react-native-maps (Google Maps on Android, Apple Maps on iOS).
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, type MapPressEvent } from 'react-native-maps';
+import MapView, { Circle, Marker, type MapPressEvent } from 'react-native-maps';
 
 import { categoryInfo } from '@/lib/reports';
 import { MAURITIUS_CENTER } from '@/lib/places';
@@ -13,7 +13,7 @@ import { Icon, type IconName } from './ui';
 const zoomToDelta = (zoom: number) => 360 / 2 ** zoom;
 
 export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function ReportMap(
-  { reports = [], me, selectedId, onSelect, pick, initial },
+  { reports = [], zones = [], me, selectedId, onSelect, pick, initial },
   ref,
 ) {
   const map = useRef<MapView>(null);
@@ -49,6 +49,17 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
         else onSelect?.(null);
       }}>
       {ready &&
+        zones.map((z) => (
+          <Circle
+            key={z.id}
+            center={{ latitude: z.lat, longitude: z.lng }}
+            radius={z.radius}
+            fillColor={hexToRgba(z.color, z.opacity)}
+            strokeColor={hexToRgba(z.color, Math.min(1, z.opacity + 0.3))}
+            strokeWidth={1}
+          />
+        ))}
+      {ready &&
         reports
           .filter((r) => r.lat != null && r.lng != null)
           .map((r) => (
@@ -75,6 +86,11 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
     </MapView>
   );
 });
+
+function hexToRgba(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 function Pin({ color, icon, selected }: { color: string; icon: IconName; selected?: boolean }) {
   const size = selected ? 40 : 32;

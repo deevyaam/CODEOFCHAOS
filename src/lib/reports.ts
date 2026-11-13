@@ -77,8 +77,10 @@ export type ReportFilter = {
   category?: Category | 'all';
   status?: Status | 'open' | 'all';
   search?: string;
-  sort?: 'newest' | 'confirmed';
+  sort?: 'newest' | 'confirmed' | 'oldest';
   mine?: boolean;
+  /** Only reports created at least this many days ago. */
+  olderThanDays?: number;
   limit?: number;
 };
 
@@ -87,6 +89,7 @@ export async function fetchReports(f: ReportFilter = {}, userId?: string) {
   if (f.category && f.category !== 'all') q = q.eq('category', f.category);
   if (f.status === 'open') q = q.neq('status', 'fixed');
   else if (f.status && f.status !== 'all') q = q.eq('status', f.status);
+  if (f.olderThanDays) q = q.lt('created_at', new Date(Date.now() - f.olderThanDays * 86_400_000).toISOString());
   if (f.search?.trim()) {
     const s = f.search.trim().replace(/[%,()]/g, ' ');
     q = q.or(`title.ilike.%${s}%,description.ilike.%${s}%,town.ilike.%${s}%,place_name.ilike.%${s}%`);
@@ -97,9 +100,10 @@ export async function fetchReports(f: ReportFilter = {}, userId?: string) {
     if (!ids.length) return [] as Report[];
     q = q.in('id', ids);
   }
-  q = f.sort === 'confirmed'
-    ? q.order('me_too_count', { ascending: false }).order('created_at', { ascending: false })
-    : q.order('created_at', { ascending: false });
+  q =
+    f.sort === 'confirmed'
+      ? q.order('me_too_count', { ascending: false }).order('created_at', { ascending: false })
+      : q.order('created_at', { ascending: f.sort === 'oldest' });
   const { data, error } = await q.limit(f.limit ?? 100);
   if (error) throw error;
   return (data ?? []) as Report[];

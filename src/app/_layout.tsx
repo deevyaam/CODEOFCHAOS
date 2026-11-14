@@ -13,8 +13,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLock } from '@/components/app-lock';
 import { SplashOverlay } from '@/components/splash-overlay';
-import { useNotificationRouting } from '@/lib/push';
+import { useAutoPush, useNotificationRouting } from '@/lib/push';
 import { loadPrefs } from '@/lib/prefs';
+import { useWidgetSync } from '@/lib/widgets-sync';
 import { SessionProvider, useSession } from '@/lib/session';
 import { ThemeProvider, useTheme } from '@/theme';
 
@@ -46,6 +47,10 @@ function AppShell({ assetsReady }: { assetsReady: boolean }) {
   const { scheme, colors } = useTheme();
   const loaded = assetsReady && ready;
   useNotificationRouting(loaded && !!session);
+  // Signed-in members (not guests) who accepted the terms get notifications without a setting to find.
+  useAutoPush(session?.user.id ?? null, loaded && !!consent && !!session && !session.user.is_anonymous);
+  // Home screen widgets get a fresh snapshot when the app opens or comes back (phones only).
+  useWidgetSync(loaded, !!session && !session.user.is_anonymous);
 
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navTheme = {

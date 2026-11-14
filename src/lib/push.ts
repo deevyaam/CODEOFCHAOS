@@ -8,8 +8,9 @@ import { Platform } from 'react-native';
 
 import { EAS_PROJECT_ID } from '@/config';
 
-import type { Prefs } from './prefs';
+import { getPrefs, usePref, type Prefs } from './prefs';
 import { supabase } from './supabase';
+import { getPositionWithTimeout } from './weather';
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
@@ -88,6 +89,34 @@ export async function savePushToken(
 
 export async function removePushToken(token: string) {
   return supabase.from('push_tokens').delete().eq('token', token);
+}
+
+/**
+ * Signs this phone up for notifications automatically once a member is signed in: new reports in their alert
+ * area, updates on their reports and on reports they backed, and Discuss messages (at most one every 10 minutes).
+ * The phone asks "Allow notifications?" the first time; if they say no, nothing is saved and we don't ask again
+ * (the phone settings are where they change their mind). Re-saved when the alert area changes.
+ */
+export function useAutoPush(userId: string | null, enabled: boolean) {
+  const area = usePref('alertArea');
+  useEffect(() => {
+    if (!enabled || !userId || !pushSupport().ok) return;
+    let alive = true;
+    (async () => {
+      try {
+        const token = await getPushToken(true);
+        if (!alive || !token) return;
+        const near = area.mode === 'near' ? await getPositionWithTimeout() : null;
+        if (!alive) return;
+        await savePushToken(token, { ...getPrefs(), alertArea: area, notifyMyReports: true, notifyMeToo: true, notifyDiscussion: true }, near);
+      } catch {
+        // No push on this phone (no permission or no Firebase): the app works the same without it.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId, enabled, area]);
 }
 
 /** Opening a notification goes to the screen it is about. */

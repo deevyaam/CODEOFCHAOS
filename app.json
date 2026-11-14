@@ -85,7 +85,53 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "AnsamQuick",
+              "displayName": "Ansam Moris",
+              "description": "Open reports in your alert area at a glance",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall"
+                ],
+                "initialLayout": "src/widgets/quick-widget.ios.tsx"
+              },
+              "android": {
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "minWidth": 110,
+                "minHeight": 110,
+                "resizeMode": "both",
+                "initialLayout": "src/widgets/quick-widget.android.tsx"
+              }
+            },
+            {
+              "name": "AnsamNearby",
+              "displayName": "Ansam Moris – Near you",
+              "description": "Weather and the newest open reports near you",
+              "ios": {
+                "supportedFamilies": [
+                  "systemMedium"
+                ],
+                "initialLayout": "src/widgets/nearby-widget.ios.tsx"
+              },
+              "android": {
+                "targetCellWidth": 4,
+                "targetCellHeight": 2,
+                "minWidth": 250,
+                "minHeight": 110,
+                "resizeMode": "both",
+                "initialLayout": "src/widgets/nearby-widget.android.tsx"
+              }
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -92,7 +92,15 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {}
-    }
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "f7130192-35a1-448d-8bc5-83b199225af0"
+      }
+    },
+    "owner": "deevyaam"
   }
 }

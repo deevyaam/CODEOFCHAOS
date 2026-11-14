@@ -2,7 +2,7 @@
 // the legal pages highlight them and the deploy script refuses to publish while any remain.
 import Constants from 'expo-constants';
 
-export const APP_NAME = 'Life Powered by Tech';
+export const APP_NAME = 'Ansam Moris';
 
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 export const SUPABASE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';

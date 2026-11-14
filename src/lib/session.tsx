@@ -63,7 +63,7 @@ const Ctx = createContext<SessionState | null>(null);
 
 /**
  * Where sign-in (Google, email links) returns to. Each one must be in Supabase → Authentication → URL Configuration:
- *   web: <origin>/auth-callback · Expo Go: exp(s)://<dev server>/--/auth-callback · app builds: lifepoweredbytech://auth-callback
+ *   web: <origin>/auth-callback · Expo Go: exp(s)://<dev server>/--/auth-callback · app builds: ansammoris://auth-callback
  */
 export function oauthRedirectUrl() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/auth-callback`;

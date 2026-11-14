@@ -1,4 +1,4 @@
--- Life Powered by Tech — community features (run after schema.sql).
+-- Ansam Moris — community features (run after schema.sql).
 -- Discussion room, flags, moderation, assistant chats, push tokens, event queue and media cleanup.
 
 -- ─────────────────────────────────────────────────────────────────────────────

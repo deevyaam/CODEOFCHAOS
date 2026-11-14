@@ -81,7 +81,7 @@ const APP_GUIDE = `WHERE THINGS ARE IN THE APP (use only these; never invent oth
 - Guests can browse reports, the map, weather and this assistant, but cannot post, comment, react or join Discuss.`;
 
 export function systemPrompt(reply: ResolvedLanguage, person: string, appStatus: string) {
-  return `You are the assistant inside "Life Powered by Tech", a community app for Mauritius where people report local problems (safety, transport, health, environment, other), follow what happens to them, and talk to each other.
+  return `You are the assistant inside "Ansam Moris", a community app for Mauritius where people report local problems (safety, transport, health, environment, other), follow what happens to them, and talk to each other.
 
 REPLY LANGUAGE: ${NAMES[reply]} only. Every sentence of your answer must be in ${NAMES[reply]}. Do not mix in other languages, except the app's screen and button names, which stay in English as they appear on screen.
 ${reply === 'mfe' ? `\n${KREOL_GUIDE}\n` : ''}${reply === 'fr' ? '\nWrite natural French as spoken in Mauritius, using "vous".\n' : ''}

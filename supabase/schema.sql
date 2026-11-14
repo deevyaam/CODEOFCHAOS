@@ -1,4 +1,4 @@
--- Life Powered by Tech — core schema (run first, then community.sql).
+-- Ansam Moris — core schema (run first, then community.sql).
 -- Every table has Row Level Security. Guests (anonymous sign-ins) can read reports but never write.
 -- Safe to re-run: uses IF NOT EXISTS / OR REPLACE / DROP POLICY IF EXISTS.
 

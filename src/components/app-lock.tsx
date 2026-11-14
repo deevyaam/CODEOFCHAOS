@@ -28,7 +28,7 @@ export function AppLock() {
   const { colors } = useTheme();
 
   const unlock = useCallback(async () => {
-    if (await authenticate('Unlock Life Powered by Tech')) setLocked(false);
+    if (await authenticate('Unlock Ansam Moris')) setLocked(false);
   }, []);
 
   useEffect(() => {

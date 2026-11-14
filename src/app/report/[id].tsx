@@ -149,10 +149,10 @@ export default function ReportDetail() {
 
   const sendTo = async (a: Authority) => {
     if (!report) return;
-    const link = Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/report/${report.id}` : `lifepoweredbytech://report/${report.id}`;
+    const link = Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/report/${report.id}` : `ansammoris://report/${report.id}`;
     const where = [report.place_name, report.town].filter(Boolean).join(', ');
     const map = report.lat != null ? `https://www.openstreetmap.org/?mlat=${report.lat}&mlon=${report.lng}#map=18/${report.lat}/${report.lng}` : '';
-    const body = `${report.title}\n\n${report.description}\n\n${where ? `Where: ${where}\n` : ''}${map ? `Map: ${map}\n` : ''}Reported via Life Powered by Tech: ${link}`;
+    const body = `${report.title}\n\n${report.description}\n\n${where ? `Where: ${where}\n` : ''}${map ? `Map: ${map}\n` : ''}Reported via Ansam Moris: ${link}`;
     if (a.email) await Linking.openURL(`mailto:${a.email}?subject=${encodeURIComponent(`Report: ${report.title}`)}&body=${encodeURIComponent(body)}`);
     else if (a.url) await Linking.openURL(a.url);
     else await Share.share({ message: body, title: report.title });
@@ -407,7 +407,7 @@ export default function ReportDetail() {
           title="Share"
           onPress={() => {
             setSheet(null);
-            Share.share({ message: `${report.title} — reported on Life Powered by Tech` });
+            Share.share({ message: `${report.title} — reported on Ansam Moris` });
           }}
         />
         {!isGuest && !isOwner && (

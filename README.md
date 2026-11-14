@@ -1,4 +1,4 @@
-# Life Powered by Tech
+# Ansam Moris
 
 A community app for Mauritius: report local problems (safety, transport, health, environment, other), follow what happens to them, and talk to each other. Expo SDK 58 · Expo Router · React Native 0.88 · Supabase.
 
@@ -36,7 +36,7 @@ A community app for Mauritius: report local problems (safety, transport, health,
 2. SQL editor: run `supabase/schema.sql`, then `supabase/community.sql`.
 3. Authentication → Sign In / Providers: enable **Email**, **Anonymous sign-ins** (guest mode), and **Google** (needs a client id/secret from Google Cloud).
 4. Authentication → URL configuration → Redirect URLs, add:
-   - `lifepoweredbytech://auth-callback` (installed app)
+   - `ansammoris://auth-callback` (installed app)
    - `exp://**` (Expo Go during development)
    - `http://localhost:8081/auth-callback` and your web URL + `/auth-callback`
 5. Edge Functions (Supabase CLI):

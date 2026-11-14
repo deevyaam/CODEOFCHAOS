@@ -45,7 +45,7 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
     <WebView
       ref={view}
       // The app's web address as the page's origin, so map tile servers see who is asking.
-      source={{ html, baseUrl: 'https://life-powered-by-tech.vercel.app/' }}
+      source={{ html, baseUrl: 'https://ansam-moris.vercel.app/' }}
       originWhitelist={['https://*']}
       onMessage={onMessage}
       javaScriptEnabled

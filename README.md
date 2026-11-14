@@ -40,6 +40,7 @@ A community app for Mauritius: report local problems (safety, transport, health,
 | `scripts/test-assistant.mjs` | Sends Kreol, French and English questions to Ollama with the real prompt |
 | `scripts/build-legal.mjs` | Generates `public/*.html` legal pages (runs on every web build) |
 | `scripts/deploy-web.mjs` | Commit → build → `eas deploy --prod` → `DEPLOYMENTS.md` → tag `web-YYYY-MM-DD-HHMM` |
+| `DECISIONS.md` | Decision log: why the app works the way it does. Add an entry when you make a choice someone might question later |
 
 ## Placeholders still to fill in
 

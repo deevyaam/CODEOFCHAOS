@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { pinOf } from '@/lib/reports';
 
-import type { ReportMapProps } from './report-map.types';
+import type { Basemap, ReportMapProps } from './report-map.types';
 import type { IconName } from './ui';
 
 /** The icon as a character of the Ionicons font, which the map page loads itself (see iconFont). */
@@ -45,7 +45,7 @@ export function toBase64(buf: ArrayBuffer) {
 
 const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist';
 
-export function mapHtml(dark: boolean, start: { lat: number; lng: number; zoom: number }, layers: boolean) {
+export function mapHtml(dark: boolean, start: { lat: number; lng: number; zoom: number }, layers: boolean, basemap: Basemap = 'map') {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="${LEAFLET}/leaflet.css" crossorigin="">
 <style>
@@ -55,6 +55,12 @@ html,body,#map{height:100%;margin:0;background:${dark ? '#0B1418' : '#E9EEF0'}}
 .pin i{transform:rotate(45deg);font:normal 15px/1 lption;color:#fff;speak:never}
 .pin.sel i{font-size:20px}
 .leaflet-top{top:120px}
+.leaflet-control-layers{border:0!important;border-radius:14px!important;box-shadow:0 4px 14px rgba(0,0,0,.25)!important;background:${dark ? '#17252B' : '#fff'}!important;color:${dark ? '#E8EEF0' : '#14212A'}}
+.leaflet-control-layers-toggle{width:44px!important;height:44px!important;border-radius:14px;${dark ? 'filter:invert(1) hue-rotate(180deg);' : ''}}
+.leaflet-control-layers-expanded{padding:6px 10px!important;font:600 15px/1.2 system-ui,sans-serif}
+.leaflet-control-layers-base label{display:flex;align-items:center;gap:8px;min-height:40px;cursor:pointer}
+.leaflet-control-layers-base input{width:18px;height:18px;margin:0;accent-color:#0E7C74}
+.leaflet-control-zoom a{width:40px!important;height:40px!important;line-height:40px!important;font-size:20px!important;${dark ? 'background:#17252B!important;color:#E8EEF0!important;border-color:#2A3A41!important;' : ''}}
 .me{width:18px;height:18px;border-radius:50%;background:#2F6FDB;border:3px solid #fff;box-shadow:0 0 0 6px rgba(47,111,219,.25);box-sizing:border-box}
 ${dark ? '.leaflet-tile-pane .street{filter:invert(.92) hue-rotate(180deg) brightness(.9) contrast(.9)}' : ''}
 </style></head><body><div id="map"></div>
@@ -63,13 +69,15 @@ ${dark ? '.leaflet-tile-pane .street{filter:invert(.92) hue-rotate(180deg) brigh
 const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([${start.lat},${start.lng}],${start.zoom});
 const street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,className:'street',attribution:'&copy; OpenStreetMap contributors'});
 const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery &copy; Esri'});
-street.addTo(map);
+(${basemap === 'satellite' ? 'sat' : 'street'}).addTo(map);
 ${layers ? "L.control.layers({'Map':street,'Satellite':sat},null,{position:'topright'}).addTo(map);" : ''}
 L.control.zoom({position:'topright'}).addTo(map);
 let zones=L.layerGroup().addTo(map), markers=L.layerGroup().addTo(map), me=null, pickMarker=null, pickMode=false;
 const send=(m)=>{m=Object.assign({__lpt:true},m); if(window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(m)); else parent.postMessage(m,'*');};
 const esc=(t)=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pinIcon=(color,g,sel)=>{const s=sel?40:30;return L.divIcon({className:'',html:'<div class="pin'+(sel?' sel':'')+'" style="background:'+esc(color)+'"><i aria-hidden="true">'+esc(g||'')+'</i></div>',iconSize:[s,s],iconAnchor:[s/2,Math.round(s/2+s*0.707)]});};
+map.on('baselayerchange',e=>send({type:'basemap',value:e.layer===sat?'satellite':'map'}));
+const setBase=(v)=>{const on=v==='satellite'?sat:street, off=v==='satellite'?street:sat; if(map.hasLayer(on)) return; map.removeLayer(off); on.addTo(map); on.bringToBack();};
 map.on('click',e=>{ if(pickMode) send({type:'pick',lat:e.latlng.lat,lng:e.latlng.lng}); else send({type:'select',id:null}); });
 function onMsg(m){
   if(!m||!m.__lpt) return;
@@ -81,6 +89,7 @@ function onMsg(m){
   }); }
   if(m.type==='me'){ if(me) me.remove(); if(m.lat!=null) me=L.marker([m.lat,m.lng],{icon:L.divIcon({className:'',html:'<div class="me" title="You are here"></div>',iconSize:[18,18]})}).addTo(map); }
   if(m.type==='font'&&window.FontFace){ const buf=m.buf||(m.b64&&Uint8Array.from(atob(m.b64),c=>c.charCodeAt(0)).buffer); if(buf) new FontFace('lption',buf).load().then(f=>document.fonts.add(f)).catch(()=>{}); }
+  if(m.type==='basemap'){ setBase(m.value); }
   if(m.type==='center'){ map.flyTo([m.lat,m.lng],m.zoom,{duration:m.instant?0:0.35}); }
   if(m.type==='pick'){ pickMode=true; if(pickMarker) pickMarker.remove(); if(m.lat!=null){ pickMarker=L.marker([m.lat,m.lng],{draggable:true,icon:pinIcon(m.color,m.g,true)}).addTo(map); pickMarker.on('dragend',()=>{const p=pickMarker.getLatLng();send({type:'pick',lat:p.lat,lng:p.lng});}); } }
 }
@@ -91,14 +100,18 @@ send({type:'ready'});
 }
 
 /** Messages the page sends back. */
-export type FromMap = { type: 'ready' } | { type: 'select'; id: string | null } | { type: 'pick'; lat: number; lng: number };
+export type FromMap =
+  | { type: 'ready' }
+  | { type: 'select'; id: string | null }
+  | { type: 'pick'; lat: number; lng: number }
+  | { type: 'basemap'; value: Basemap };
 
 /**
  * Keeps the map page in step with the props. `post` delivers one message to the page; `fontAsText` sends the
  * icon font as base64 (a WebView can only pass text).
  */
 export function useLeafletSync(
-  { reports = [], zones = [], me, selectedId, onSelect, pick }: ReportMapProps,
+  { reports = [], zones = [], me, selectedId, onSelect, pick, basemap = 'map', onBasemapChange }: ReportMapProps,
   post: (m: object) => void,
   fontAsText: boolean,
 ) {
@@ -108,7 +121,13 @@ export function useLeafletSync(
     if (m.type === 'ready') setReady(true);
     if (m.type === 'select') onSelect?.(m.id);
     if (m.type === 'pick') pick?.onPick({ lat: m.lat, lng: m.lng });
+    if (m.type === 'basemap') onBasemapChange?.(m.value);
   };
+
+  useEffect(() => {
+    if (ready) post({ type: 'basemap', value: basemap });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, basemap]);
 
   useEffect(() => {
     if (!ready) return;

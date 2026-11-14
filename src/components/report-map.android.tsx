@@ -23,7 +23,7 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
   const start = useMemo(() => ({ ...MAURITIUS_CENTER, zoom: 9.5, ...initial }), [initial]);
   // Built once per theme; later updates go through messages.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => mapHtml(scheme === 'dark', start, layers), [scheme, layers]);
+  const html = useMemo(() => mapHtml(scheme === 'dark', start, layers, props.basemap), [scheme, layers]);
 
   const post = (m: object) => view.current?.injectJavaScript(`window.__lpt&&window.__lpt(${JSON.stringify({ __lpt: true, ...m })});true;`);
   const receive = useLeafletSync(props, post, true);

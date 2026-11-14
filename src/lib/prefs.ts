@@ -20,6 +20,7 @@ export type Prefs = {
   /** Town name from TOWNS, or 'my-location'. */
   weatherTown: string;
   weatherCollapsed: boolean;
+  mapBasemap: 'map' | 'satellite';
   quickReactions: string[];
   anonymousDefault: boolean;
   appLock: boolean;
@@ -39,6 +40,7 @@ export const DEFAULT_PREFS: Prefs = {
   weatherStyle: 'dynamic',
   weatherTown: 'my-location',
   weatherCollapsed: false,
+  mapBasemap: 'map',
   quickReactions: DEFAULT_QUICK_REACTIONS,
   anonymousDefault: false,
   appLock: false,

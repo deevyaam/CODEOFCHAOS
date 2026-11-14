@@ -38,8 +38,10 @@ export function WeatherCard() {
 
   const rot = useSharedValue(collapsed ? 0 : 180);
   useEffect(() => {
-    rot.set(withSpring(collapsed ? 0 : 180, spring));
-  }, [collapsed, rot]);
+    // Reduce Motion: flip the arrow straight away instead of spinning it.
+    rot.set(reduce ? (collapsed ? 0 : 180) : withSpring(collapsed ? 0 : 180, spring));
+  }, [collapsed, rot, reduce]);
+  const toggle = () => setPref('weatherCollapsed', !collapsed);
   const arrow = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
 
   const animate = style === 'dynamic' && !reduce;
@@ -53,17 +55,30 @@ export function WeatherCard() {
         <View>
           <WeatherScene forecast={data} animate={animate} />
           <View style={styles.overlay} pointerEvents="box-none">
-            <PressableScale
-              onPress={() => setPicker(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Weather place: ${data.place}. Change`}
-              style={styles.placeChip}>
-              <Icon name={data.isMyLocation ? 'navigate' : 'location'} size={14} color="#fff" />
-              <Text variant="label" color="#fff" numberOfLines={1}>
-                {data.isMyLocation ? `Near ${data.place}` : data.place}
-              </Text>
-              <Icon name="chevron-down" size={14} color="#fff" />
-            </PressableScale>
+            <View style={styles.topRow} pointerEvents="box-none">
+              <PressableScale
+                onPress={() => setPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Weather place: ${data.place}. Change`}
+                style={styles.placeChip}>
+                <Icon name={data.isMyLocation ? 'navigate' : 'location'} size={14} color="#fff" />
+                <Text variant="label" color="#fff" numberOfLines={1}>
+                  {data.isMyLocation ? `Near ${data.place}` : data.place}
+                </Text>
+                <Icon name="chevron-down" size={14} color="#fff" />
+              </PressableScale>
+              <PressableScale
+                onPress={toggle}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !collapsed }}
+                accessibilityLabel={collapsed ? 'Show the forecast' : 'Hide the forecast'}
+                hitSlop={6}
+                style={styles.expand}>
+                <Animated.View style={arrow}>
+                  <Icon name="chevron-down" size={22} color="#fff" />
+                </Animated.View>
+              </PressableScale>
+            </View>
             <View style={styles.now}>
               <Text variant="display" color="#fff" style={styles.shadowText}>
                 {Math.round(data.current.temp)}°
@@ -92,17 +107,20 @@ export function WeatherCard() {
 
       {data && (
         <Pressable
-          onPress={() => setPref('weatherCollapsed', !collapsed)}
+          onPress={toggle}
           accessibilityRole="button"
           accessibilityState={{ expanded: !collapsed }}
-          accessibilityLabel={collapsed ? 'Show forecast' : 'Hide forecast'}
+          accessibilityLabel={collapsed ? 'Show the forecast' : 'Hide the forecast'}
           style={styles.toggle}>
-          <Text variant="label" muted>
+          <Text variant="label" muted style={{ flex: 1 }} numberOfLines={2}>
             {data.fellBack ? 'Location didn’t answer — showing Port Louis' : `Wind ${Math.round(data.current.wind)} km/h · Clouds ${data.current.cloud}%`}
           </Text>
-          <Animated.View style={arrow}>
-            <Icon name="chevron-down" size={20} color={colors.textMuted} />
-          </Animated.View>
+          <View style={[styles.moreChip, { backgroundColor: colors.primarySoft }]}>
+            <Text variant="label" color={colors.primary}>{collapsed ? 'Forecast' : 'Hide'}</Text>
+            <Animated.View style={arrow}>
+              <Icon name="chevron-down" size={18} color={colors.primary} />
+            </Animated.View>
+          </View>
         </Pressable>
       )}
 
@@ -203,7 +221,18 @@ function DailyList({ forecast }: { forecast: NonNullable<ReturnType<typeof useFo
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, overflow: 'hidden' },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: spacing.lg, justifyContent: 'space-between' },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  expand: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 12, paddingRight: 8, minHeight: 32, borderRadius: radius.pill },
   placeChip: {
+    flexShrink: 1,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
@@ -217,7 +246,7 @@ const styles = StyleSheet.create({
   now: { gap: 0 },
   shadowText: { textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
   loading: { height: 160, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, minHeight: 48 },
+  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, minHeight: 52 },
   hours: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   hour: { width: 60, paddingVertical: spacing.md, borderRadius: radius.md, alignItems: 'center', gap: 4 },
   astro: { flexDirection: 'row', paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, gap: spacing.sm },

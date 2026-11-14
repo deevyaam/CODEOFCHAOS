@@ -3,6 +3,7 @@ import type { Report } from '@/lib/reports';
 import type { Zone } from '@/lib/safety';
 
 export type LatLng = { lat: number; lng: number };
+export type Basemap = 'map' | 'satellite';
 
 export type ReportMapHandle = {
   centerOn: (p: LatLng, zoomedIn?: boolean) => void;
@@ -18,6 +19,10 @@ export type ReportMapProps = {
   initial?: LatLng & { zoom?: number };
   /** Shaded circles drawn under the pins (safety heat, dark spots). */
   zones?: Zone[];
-  /** Web only: show the satellite layer switch. */
+  /** Show the map's own Map/Satellite switch (web and Android). Screens with their own button leave it off. */
   layers?: boolean;
+  /** Street map or satellite photos. */
+  basemap?: Basemap;
+  /** Called when the person switches with the map's own switch. */
+  onBasemapChange?: (b: Basemap) => void;
 };

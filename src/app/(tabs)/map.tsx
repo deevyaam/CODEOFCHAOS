@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTabBarSpace } from '@/components/layout';
@@ -11,6 +11,7 @@ import { Sheet } from '@/components/sheet';
 import { Button, Chip, Icon, PressableScale, Segmented, Text } from '@/components/ui';
 import { NoTabSwipe } from '@/components/tab-swipe';
 import { distanceKm, formatDistance } from '@/lib/places';
+import { setPref, usePref } from '@/lib/prefs';
 import { CATEGORIES, categoryInfo, timeAgo, useReports, type Category } from '@/lib/reports';
 import { DARK_COLOR, HEAT_DAYS, HEAT_LEVELS, TIME_WINDOWS, darkSpots, safetyHeat, type TimeWindow } from '@/lib/safety';
 import { useSession } from '@/lib/session';
@@ -34,7 +35,8 @@ export default function MapScreen() {
   const [locating, setLocating] = useState(false);
 
   // One query feeds every layer: open reports for pins and dark spots, recent fixed ones for the heat layer.
-  const { reports: all } = useReports({ status: 'all', limit: 500 }, user?.id);
+  const { reports: all, loading, reload } = useReports({ status: 'all', limit: 500 }, user?.id);
+  const basemap = usePref('mapBasemap');
   const open = useMemo(() => all.filter((r) => r.status !== 'fixed'), [all]);
   const heat = useMemo(() => safetyHeat(all, timeWindow), [all, timeWindow]);
   const dark = useMemo(() => darkSpots(all), [all]);
@@ -71,7 +73,7 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ReportMap ref={map} reports={pins} zones={zones} me={me} selectedId={selected} onSelect={setSelected} />
+      <ReportMap ref={map} reports={pins} zones={zones} me={me} selectedId={selected} onSelect={setSelected} basemap={basemap} layers={false} />
 
       <NoTabSwipe style={[styles.top, { top: insets.top + spacing.sm }]}>
         <View style={[styles.layerSwitch, { backgroundColor: colors.surface, boxShadow: shadows.float }]}>
@@ -154,6 +156,23 @@ export default function MapScreen() {
         </View>
       )}
 
+      <View style={[styles.fabStack, { bottom: tabSpace - spacing.sm }]} pointerEvents="box-none">
+        <PressableScale
+          onPress={reload}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={loading ? 'Refreshing reports' : 'Refresh reports'}
+          style={[styles.fabSmall, { backgroundColor: colors.surface, boxShadow: shadows.float }]}>
+          {loading ? <ActivityIndicator color={colors.primary} /> : <Icon name="refresh" size={22} color={colors.primary} />}
+        </PressableScale>
+        <PressableScale
+          onPress={() => setPref('mapBasemap', basemap === 'satellite' ? 'map' : 'satellite')}
+          accessibilityRole="button"
+          accessibilityLabel={basemap === 'satellite' ? 'Show the street map' : 'Show satellite view'}
+          style={[styles.fabSmall, { backgroundColor: basemap === 'satellite' ? colors.primary : colors.surface, boxShadow: shadows.float }]}>
+          <Icon name={basemap === 'satellite' ? 'map' : 'earth'} size={22} color={basemap === 'satellite' ? colors.onPrimary : colors.primary} />
+        </PressableScale>
+      </View>
       <PressableScale
         onPress={centreOnMe}
         accessibilityRole="button"
@@ -213,6 +232,9 @@ const styles = StyleSheet.create({
   scale: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xs },
   scaleItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 12, height: 12, borderRadius: 6 },
+  // Refresh and Map/Satellite sit in a column above "Centre on me" (52 + 12 px gap).
+  fabStack: { position: 'absolute', right: GUTTER + 4, gap: spacing.md, transform: [{ translateY: -(52 + spacing.md) }] },
+  fabSmall: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   fab: {
     position: 'absolute',
     right: GUTTER,

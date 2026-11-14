@@ -18,7 +18,7 @@ import type { LatLng } from '@/components/report-map.types';
 import { Button, Card, Chip, Empty, Icon, Notice, PressableScale, Text, type IconName } from '@/components/ui';
 import { EMERGENCY_NUMBERS } from '@/config';
 import { nearestTown, TOWNS } from '@/lib/places';
-import { usePref } from '@/lib/prefs';
+import { setPref, usePref } from '@/lib/prefs';
 import { useReadAloud } from '@/lib/read-aloud';
 import { clearReportDraft, peekReportDraft } from '@/lib/report-draft';
 import { ChoiceCard } from '@/components/choice-card';
@@ -103,6 +103,7 @@ export default function NewReport() {
   const { colors, type } = useTheme();
   const insets = useSafeAreaInsets();
   const anonDefault = usePref('anonymousDefault');
+  const basemap = usePref('mapBasemap');
   const reader = useReadAloud();
   const scroller = useRef<ScrollViewInstance>(null);
 
@@ -478,6 +479,8 @@ export default function NewReport() {
                         },
                       }}
                       layers
+                      basemap={basemap}
+                      onBasemapChange={(b) => setPref('mapBasemap', b)}
                     />
                   </View>
                   <TextInput

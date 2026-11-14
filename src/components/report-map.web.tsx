@@ -14,7 +14,7 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
   const start = useMemo(() => ({ ...MAURITIUS_CENTER, zoom: 10, ...initial }), [initial]);
   // The document is built once per theme; later updates go through messages.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const srcDoc = useMemo(() => mapHtml(scheme === 'dark', start, layers), [scheme, layers]);
+  const srcDoc = useMemo(() => mapHtml(scheme === 'dark', start, layers, props.basemap), [scheme, layers]);
 
   const post = (m: object) => frame.current?.contentWindow?.postMessage({ __lpt: true, ...m }, '*');
   const receive = useLeafletSync(props, post, false);

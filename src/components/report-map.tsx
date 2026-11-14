@@ -13,7 +13,7 @@ import { MapPin } from './map-pin';
 const zoomToDelta = (zoom: number) => 360 / 2 ** zoom;
 
 export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function ReportMap(
-  { reports = [], zones = [], me, selectedId, onSelect, pick, initial },
+  { reports = [], zones = [], me, selectedId, onSelect, pick, initial, basemap = 'map' },
   ref,
 ) {
   const map = useRef<MapView>(null);
@@ -40,6 +40,7 @@ export const ReportMap = forwardRef<ReportMapHandle, ReportMapProps>(function Re
         longitudeDelta: zoomToDelta(start.zoom ?? 9.5),
       }}
       userInterfaceStyle={scheme}
+      mapType={basemap === 'satellite' ? 'hybrid' : 'standard'}
       showsUserLocation={!!me}
       showsMyLocationButton={false}
       toolbarEnabled={false}

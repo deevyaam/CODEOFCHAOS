@@ -2,6 +2,28 @@
 
 A community app for Mauritius: report local problems (safety, transport, health, environment, other), follow what happens to them, and talk to each other. Expo SDK 58 · Expo Router · React Native 0.88 · Supabase.
 
+## Try it
+
+| | Link | Notes |
+|---|---|---|
+| 🌐 **Website** (any phone or computer) | **[ansam-moris.vercel.app](https://ansam-moris.vercel.app)** | Nothing to install. Sign in with Google or email, or continue as a guest to look around |
+| 🤖 **Android app (APK)** | **[Download Ansam Moris for Android](https://expo.dev/artifacts/eas/Xo7zMCh16dpmQnpbIY_XClPL7ZqYyo_CnmGgnOnSpb0.apk)** (123 MB) | Includes the home screen widgets. See how to install it below |
+| 📱 **iPhone** | Use the website | An iPhone build needs an Apple Developer account |
+
+**Installing the Android app**
+
+1. Open the download link on your Android phone and download the file.
+2. Tap the downloaded file. If Android asks, allow your browser to **install unknown apps**, then tap **Install**.
+3. Open **Ansam Moris**, accept the terms, and sign in (or continue as a guest).
+4. Optional: long-press your home screen → **Widgets** → **Ansam Moris** to add the 2×2 or 4×2 widget.
+
+**Good to know when trying it**
+
+- **Guests** can browse reports, the map, the weather and the assistant; **sign in** to post reports, comment and join Discuss.
+- The **assistant** runs on the team's own computer, so it only answers while that computer is online; if it says it's unavailable, try again later.
+- **Push notifications** aren't switched on in this build yet (Firebase still to be set up).
+- The Android download link comes from Expo's build service; if it has expired, open an issue and we'll post a fresh one.
+
 ## What's where
 
 | Path | What |

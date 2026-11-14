@@ -14,10 +14,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StackHeader } from '@/components/layout';
 import { StatusPill } from '@/components/report-card';
 import { ReportMap } from '@/components/report-map';
-import type { LatLng } from '@/components/report-map.types';
+import type { LatLng, ReportMapHandle } from '@/components/report-map.types';
 import { Button, Card, Chip, Empty, Icon, Notice, PressableScale, Text, type IconName } from '@/components/ui';
 import { EMERGENCY_NUMBERS } from '@/config';
-import { nearestTown, TOWNS } from '@/lib/places';
+import { useLiveLocation } from '@/lib/live-location';
+import { distanceKm, nearestTown, TOWNS } from '@/lib/places';
 import { setPref, usePref } from '@/lib/prefs';
 import { useReadAloud } from '@/lib/read-aloud';
 import { clearReportDraft, peekReportDraft } from '@/lib/report-draft';
@@ -39,7 +40,6 @@ import {
 } from '@/lib/reports';
 import { useSession } from '@/lib/session';
 import { BUCKETS, supabase } from '@/lib/supabase';
-import { getPositionWithTimeout } from '@/lib/weather';
 import { GUTTER, radius, spacing, useTheme } from '@/theme';
 
 type Picked = { uri: string; mimeType?: string | null; type?: string | null };
@@ -116,9 +116,12 @@ export default function NewReport() {
   const [description, setDescription] = useState(draft?.description ?? '');
   const [media, setMedia] = useState<Picked[]>(draft?.media ?? []);
   const [where, setWhere] = useState<Where | null>(null);
-  const [locating, setLocating] = useState(false);
+  // "I am there now" follows the phone's live position until the person stops it or places the pin themselves.
+  const [following, setFollowing] = useState(false);
   const [point, setPoint] = useState<LatLng | null>(null);
   const [pinSheet, setPinSheet] = useState(false);
+  const mapRef = useRef<ReportMapHandle>(null);
+  const lastCentered = useRef<LatLng | null>(null);
   const [pinColor, setPinColor] = useState<string | null>(null);
   const [pinIcon, setPinIcon] = useState<IconName | null>(null);
   const [when, setWhen] = useState(0);
@@ -139,6 +142,28 @@ export default function NewReport() {
   const icon = pinIcon ?? autoIcon;
   const pin = category ? pinOf({ category, pin_color: color, pin_icon: icon }) : null;
   const sharePlace = where === 'here' || where === 'map';
+  const live = useLiveLocation(
+    step === 2 && where === 'here' && following,
+    (f) => {
+      setPoint({ lat: f.lat, lng: f.lng });
+      // Keep the map on the person without fighting them: recentre only after moving ~30 m.
+      if (!lastCentered.current || distanceKm(lastCentered.current, f) > 0.03) {
+        mapRef.current?.centerOn(f, true);
+        lastCentered.current = f;
+      }
+    },
+    (reason) => {
+      setFollowing(false);
+      setWhere('map');
+      setError(
+        reason === 'denied'
+          ? 'To use your live location, allow location for this app in your phone or browser settings. Or tap the map to put the pin where the problem is.'
+          : 'We couldn’t find where you are. Tap the map to put the pin where the problem is.',
+      );
+    },
+  );
+  const tracking = where === 'here' && following;
+  const locating = tracking && live.status === 'starting';
   const town = townChoice === undefined ? (point && sharePlace ? nearestTown(point).name : null) : townChoice;
 
   // Duplicate detection: open reports of the same type within 300 m.
@@ -214,20 +239,16 @@ export default function NewReport() {
     if (!res.canceled) setMedia((m) => [...m, ...res.assets].slice(0, 6));
   };
 
-  const chooseWhere = async (w: Where) => {
+  const chooseWhere = (w: Where) => {
     setHint(null);
     setError(null);
     setWhere(w);
-    if (w !== 'here') return;
-    setLocating(true);
-    const pos = await getPositionWithTimeout();
-    setLocating(false);
-    if (pos) setPoint(pos);
-    else {
-      setWhere('map');
-      setError('We couldn’t find where you are. Tap the map to put the pin where the problem is.');
-    }
+    setFollowing(w === 'here');
+    lastCentered.current = null;
   };
+
+  // From "Show it on the map" (or after placing the pin by hand): jump back to following the live position.
+  const followMe = () => chooseWhere('here');
 
   const submit = async () => {
     if (!category) return;
@@ -446,7 +467,7 @@ export default function NewReport() {
                 <ChoiceCard
                   icon="navigate"
                   title="I am there now"
-                  hint="Use where my phone is"
+                  hint="Use my live location"
                   selected={where === 'here'}
                   busy={locating}
                   onPress={() => chooseWhere('here')}
@@ -463,26 +484,53 @@ export default function NewReport() {
 
               {sharePlace && (
                 <>
-                  <Text variant="label">
-                    {point ? 'Is the pin in the right place? Tap the map to move it.' : 'Tap the map where the problem is.'}
-                  </Text>
-                  <View style={styles.mapBox}>
-                    <ReportMap
-                      initial={point ? { ...point, zoom: 16 } : undefined}
-                      pick={{
-                        value: point,
-                        color,
-                        icon: icon ?? undefined,
-                        onPick: (p) => {
-                          setPoint(p);
-                          setHint(null);
-                        },
-                      }}
-                      layers
-                      basemap={basemap}
-                      onBasemapChange={(b) => setPref('mapBasemap', b)}
-                    />
-                  </View>
+                  {tracking ? (
+                    <View style={[styles.liveRow, { backgroundColor: colors.primarySoft }]} accessibilityLiveRegion="polite">
+                      <View style={[styles.liveDot, { backgroundColor: live.status === 'on' ? colors.primary : colors.textFaint }]} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text variant="label">
+                          {live.status === 'on'
+                            ? live.fix?.accuracy != null
+                              ? `Live location · accurate to about ${Math.max(1, Math.round(live.fix.accuracy))} m`
+                              : 'Live location · updates as you move'
+                            : 'Finding where you are…'}
+                        </Text>
+                        <Text variant="small" muted>The pin follows you. Tap the map or drag the pin to place it yourself.</Text>
+                      </View>
+                      <PressableScale onPress={() => setFollowing(false)} accessibilityRole="button" accessibilityLabel="Stop following my location" hitSlop={8}>
+                        <Text variant="label" color={colors.primary}>Stop</Text>
+                      </PressableScale>
+                    </View>
+                  ) : (
+                    <Text variant="label">
+                      {point ? 'Is the pin in the right place? Tap the map to move it.' : 'Tap the map where the problem is.'}
+                    </Text>
+                  )}
+                  {/* While waiting for the first live position, hold the map back so it opens centred on the person. */}
+                  {!(tracking && !point) && (
+                    <View style={styles.mapBox}>
+                      <ReportMap
+                        ref={mapRef}
+                        initial={point ? { ...point, zoom: 16 } : undefined}
+                        pick={{
+                          value: point,
+                          color,
+                          icon: icon ?? undefined,
+                          onPick: (p) => {
+                            setFollowing(false);
+                            setPoint(p);
+                            setHint(null);
+                          },
+                        }}
+                        layers
+                        basemap={basemap}
+                        onBasemapChange={(b) => setPref('mapBasemap', b)}
+                      />
+                    </View>
+                  )}
+                  {!tracking && (
+                    <Button kind="secondary" icon="navigate" title="Use my live location" onPress={followMe} />
+                  )}
                   <TextInput
                     style={input}
                     placeholder="Nearby place, e.g. next to the bus stop (optional)"
@@ -750,6 +798,8 @@ const styles = StyleSheet.create({
   videoBadge: { position: 'absolute', left: 6, bottom: 6 },
   remove: { position: 'absolute', top: 4, right: 4, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   mapBox: { height: 280, borderRadius: radius.lg, overflow: 'hidden' },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md },
+  liveDot: { width: 10, height: 10, borderRadius: 5 },
   disclosure: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
   swatch: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   dupe: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap', paddingVertical: spacing.xs },

@@ -107,50 +107,139 @@ await new Promise((ok) => server.listen(PORT, '127.0.0.1', ok));
 console.log(`✔ Proxy on http://127.0.0.1:${PORT} → ${OLLAMA} (${MODEL})`);
 
 // ── Tunnel ──────────────────────────────────────────────────────────────────
-const tunnel = spawn('cloudflared', ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${PORT}`], {
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-const url = await new Promise((resolve, reject) => {
-  const onData = (d) => {
-    const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
-    if (m) resolve(m[0]);
-  };
-  tunnel.stdout.on('data', onData);
-  tunnel.stderr.on('data', onData);
-  tunnel.on('exit', (code) => reject(new Error(`cloudflared exited (${code})`)));
-  setTimeout(() => reject(new Error('cloudflared did not give a URL within 60 s')), 60_000);
-}).catch((e) => {
-  console.error(`✖ ${e.message}`);
-  server.close();
-  process.exit(1);
-});
-console.log(`✔ Tunnel ${url}`);
+// Quick tunnels can lose their address (PC asleep, network change) while cloudflared keeps running, so a
+// watchdog checks the public address every minute and starts a fresh tunnel when it stops answering.
+const CHECK_EVERY_MS = 60_000;
+const FAILS_BEFORE_RESTART = 3;
+const time = () => new Date().toLocaleTimeString();
 
-// ── Supabase secrets (written to a temp file so the key never appears in a command line) ──
-const envFile = join(tmpdir(), `lpt-ollama-${process.pid}.env`);
-writeFileSync(envFile, `OLLAMA_URL=${url}\nOLLAMA_API_KEY=${KEY}\nOLLAMA_MODEL=${MODEL}\n`, { mode: 0o600 });
-const set = spawnSync('npx', ['supabase@latest', 'secrets', 'set', '--env-file', envFile, '--project-ref', ref, '--yes'], {
-  stdio: ['ignore', 'pipe', 'pipe'],
-  shell: process.platform === 'win32',
-  encoding: 'utf8',
-});
-rmSync(envFile, { force: true });
-if (set.status !== 0) {
-  console.error(`✖ Couldn't update the Supabase secrets (is the Supabase CLI signed in?):\n${(set.stderr || set.stdout).replaceAll(KEY, '***')}`);
-} else {
-  console.log(`✔ Supabase project ${ref} now uses this tunnel (OLLAMA_URL, OLLAMA_API_KEY, OLLAMA_MODEL)`);
+let tunnel = null;
+let url = null;
+let stopping = false;
+let restarting = false;
+
+/** Starts cloudflared and resolves with its https://….trycloudflare.com address. */
+function openTunnel() {
+  const child = spawn('cloudflared', ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${PORT}`], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error('cloudflared did not give a URL within 60 s'));
+    }, 60_000);
+    const onData = (d) => {
+      const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      if (m) {
+        clearTimeout(timer);
+        resolve({ child, url: m[0] });
+      }
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      reject(new Error(`cloudflared couldn't start: ${e.message}`));
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      reject(new Error(`cloudflared exited (${code})`));
+    });
+  });
 }
-console.log('\nThe assistant works while this window stays open. Press Ctrl+C to stop.\n');
+
+/** Stores the tunnel address and key as Supabase secrets (via a temp file, so the key never appears in a command line). */
+function saveSecrets(address) {
+  const envFile = join(tmpdir(), `lpt-ollama-${process.pid}.env`);
+  writeFileSync(envFile, `OLLAMA_URL=${address}\nOLLAMA_API_KEY=${KEY}\nOLLAMA_MODEL=${MODEL}\n`, { mode: 0o600 });
+  const set = spawnSync(`npx supabase@latest secrets set --env-file "${envFile}" --project-ref ${ref} --yes`, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: true,
+    encoding: 'utf8',
+  });
+  rmSync(envFile, { force: true });
+  if (set.status !== 0) {
+    console.error(`✖ Couldn't update the Supabase secrets (is the Supabase CLI signed in?):\n${(set.stderr || set.stdout).replaceAll(KEY, '***')}`);
+    return false;
+  }
+  console.log(`✔ Supabase project ${ref} now uses this tunnel (OLLAMA_URL, OLLAMA_API_KEY, OLLAMA_MODEL)`);
+  return true;
+}
+
+/** Opens a tunnel and points Supabase at it, retrying with a growing pause until it works. */
+async function startTunnel() {
+  for (let attempt = 1; !stopping; attempt++) {
+    try {
+      const t = await openTunnel();
+      tunnel = t.child;
+      url = t.url;
+      console.log(`✔ Tunnel ${url}`);
+      tunnel.on('exit', () => {
+        if (stopping || restarting || tunnel !== t.child) return;
+        console.error(`✖ [${time()}] The tunnel stopped. Starting a new one…`);
+        restart();
+      });
+      if (!saveSecrets(url)) throw new Error('secrets not saved');
+      return;
+    } catch (e) {
+      tunnel?.kill();
+      const wait = Math.min(attempt * 15, 120);
+      console.error(`✖ [${time()}] ${e.message}. Trying again in ${wait} s…`);
+      await new Promise((ok) => setTimeout(ok, wait * 1000));
+    }
+  }
+}
+
+async function restart() {
+  if (restarting || stopping) return;
+  restarting = true;
+  tunnel?.kill();
+  await startTunnel();
+  restarting = false;
+  fails = 0;
+}
+
+/** Healthy when the public address reaches our proxy: an unauthenticated POST gets the proxy's 401. */
+async function tunnelAnswers() {
+  try {
+    const r = await fetch(`${url}/api/chat`, { method: 'POST', signal: AbortSignal.timeout(20_000) });
+    return r.status === 401;
+  } catch {
+    return false;
+  }
+}
+
+let fails = 0;
+let lastCheck = Date.now();
+async function watch() {
+  if (!stopping && !restarting && url) {
+    // A long gap means the PC was asleep: the old address is very likely gone, so check without waiting.
+    const slept = Date.now() - lastCheck > CHECK_EVERY_MS * 3;
+    if (await tunnelAnswers()) {
+      if (fails) console.log(`✔ [${time()}] Tunnel answering again.`);
+      fails = 0;
+    } else {
+      fails = slept ? FAILS_BEFORE_RESTART : fails + 1;
+      console.error(`… [${time()}] Tunnel didn't answer (${fails}/${FAILS_BEFORE_RESTART}).`);
+      if (fails >= FAILS_BEFORE_RESTART) {
+        console.error(`✖ [${time()}] Tunnel address is gone. Starting a new one…`);
+        await restart();
+      }
+    }
+  }
+  lastCheck = Date.now();
+  setTimeout(watch, CHECK_EVERY_MS);
+}
+
+await startTunnel();
+console.log('\nThe assistant works while this window stays open. It restarts the tunnel by itself if it drops. Press Ctrl+C to stop.\n');
+setTimeout(watch, CHECK_EVERY_MS);
 
 const stop = () => {
-  tunnel.kill();
+  stopping = true;
+  tunnel?.kill();
   server.close();
   process.exit(0);
 };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
-tunnel.on('exit', () => {
-  console.error('✖ The tunnel stopped. Run npm run assistant:tunnel again.');
-  server.close();
-  process.exit(1);
-});

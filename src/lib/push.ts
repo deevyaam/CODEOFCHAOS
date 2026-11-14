@@ -24,7 +24,7 @@ if (Platform.OS !== 'web') {
 
 export type PushSupport =
   | { ok: true }
-  | { ok: false; reason: 'web' | 'simulator' | 'expo-go' | 'no-project-id' };
+  | { ok: false; reason: 'web' | 'simulator' | 'expo-go' | 'no-project-id' | 'no-firebase' };
 
 export function pushSupport(): PushSupport {
   if (Platform.OS === 'web') return { ok: false, reason: 'web' };
@@ -34,6 +34,10 @@ export function pushSupport(): PushSupport {
     return { ok: false, reason: 'expo-go' };
   }
   if (!EAS_PROJECT_ID) return { ok: false, reason: 'no-project-id' };
+  // Android builds made without Firebase's google-services.json can't get a push address.
+  if (Platform.OS === 'android' && !(Constants.expoConfig?.extra as { androidPushReady?: boolean } | undefined)?.androidPushReady) {
+    return { ok: false, reason: 'no-firebase' };
+  }
   return { ok: true };
 }
 
@@ -42,6 +46,7 @@ export const PUSH_REASON_TEXT: Record<Exclude<PushSupport, { ok: true }>['reason
   simulator: 'Push notifications need a real phone.',
   'expo-go': 'Push notifications need the installed app (a development or store build), not Expo Go.',
   'no-project-id': 'Push is not set up yet: link the app to an Expo project with "npx eas-cli@latest init".',
+  'no-firebase': 'Push notifications aren’t switched on in this version of the app yet. They’ll arrive in an update.',
 };
 
 export async function getPushToken(ask: boolean): Promise<string | null> {

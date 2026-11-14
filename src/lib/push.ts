@@ -67,7 +67,7 @@ export async function getPushToken(ask: boolean): Promise<string | null> {
 /** Store (or update) this phone's token with its alert area and notification choices. */
 export async function savePushToken(
   token: string,
-  prefs: Pick<Prefs, 'alertArea' | 'notifyMyReports' | 'notifyMeToo'>,
+  prefs: Pick<Prefs, 'alertArea' | 'notifyMyReports' | 'notifyMeToo' | 'notifyDiscussion'>,
   near?: { lat: number; lng: number } | null,
 ) {
   const a = prefs.alertArea;
@@ -81,6 +81,7 @@ export async function savePushToken(
     alert_lng: a.mode === 'near' ? near?.lng ?? null : null,
     notify_my_reports: prefs.notifyMyReports,
     notify_me_too: prefs.notifyMeToo,
+    notify_discussion: prefs.notifyDiscussion,
     updated_at: new Date().toISOString(),
   });
 }

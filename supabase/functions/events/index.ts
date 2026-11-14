@@ -28,7 +28,12 @@ type Token = {
   alert_km: number | null;
   notify_my_reports: boolean;
   notify_me_too: boolean;
+  notify_discussion: boolean;
+  discussion_pushed_at: string | null;
 };
+
+/** Discuss can be busy: each phone gets at most one Discuss notification in this window. */
+const DISCUSSION_QUIET_MS = 10 * 60 * 1000;
 type Push = { to: string; title: string; body: string; data?: Record<string, unknown>; sound?: 'default' };
 
 Deno.serve(async (req) => {
@@ -68,6 +73,8 @@ async function handle(kind: string, payload: Record<string, string>) {
       return statusChanged(payload.report_id, payload.to);
     case 'comment_added':
       return commentAdded(payload.report_id, payload.author_id);
+    case 'message_added':
+      return messageAdded(payload.message_id);
     case 'test_push':
       return testPush(payload.user_id);
     case 'media_cleanup':
@@ -161,6 +168,51 @@ async function commentAdded(reportId: string, authorId: string) {
       title: 'New comment on your report',
       body: report.title,
       data: { url: `/report/${report.id}` },
+    })),
+  );
+}
+
+async function messageAdded(messageId: string) {
+  const { data: msg } = await admin
+    .from('discussion_messages')
+    .select('id,user_id,body,media,hidden,deleted_at')
+    .eq('id', messageId)
+    .maybeSingle();
+  if (!msg || msg.hidden || msg.deleted_at) return;
+  const author = msg.user_id as string;
+
+  // People who blocked the author, or whom the author blocked, don't get it.
+  const { data: blocks } = await admin
+    .from('user_blocks')
+    .select('blocker_id,blocked_id')
+    .or(`blocker_id.eq.${author},blocked_id.eq.${author}`);
+  const skip = new Set<string>([author]);
+  (blocks ?? []).forEach((b) => skip.add(b.blocker_id === author ? b.blocked_id : b.blocker_id));
+
+  const since = new Date(Date.now() - DISCUSSION_QUIET_MS).toISOString();
+  const { data } = await admin
+    .from('push_tokens')
+    .select('*')
+    .eq('notify_discussion', true)
+    .or(`discussion_pushed_at.is.null,discussion_pushed_at.lt.${since}`);
+  const tokens = ((data ?? []) as Token[]).filter((t) => !skip.has(t.user_id));
+  if (!tokens.length) return;
+
+  const { data: who } = await admin.from('profiles').select('full_name').eq('id', author).maybeSingle();
+  const name = (who?.full_name as string | null)?.trim() || 'A member';
+  const text = String(msg.body ?? '').trim();
+  const media = Array.isArray(msg.media) ? msg.media.length : 0;
+  const body = text ? (text.length > 120 ? `${text.slice(0, 117)}…` : text) : media ? 'Sent a photo or video' : 'Sent a message';
+
+  // Mark first, so a second message arriving meanwhile doesn't notify the same phones again.
+  await admin.from('push_tokens').update({ discussion_pushed_at: new Date().toISOString() }).in('token', tokens.map((t) => t.token));
+  await send(
+    tokens.map((t) => ({
+      to: t.token,
+      title: `${name} in Discuss`,
+      body,
+      data: { url: '/discuss' },
+      sound: 'default',
     })),
   );
 }

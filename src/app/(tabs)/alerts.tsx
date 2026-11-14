@@ -148,6 +148,16 @@ export default function Alerts() {
                 if (token) savePushToken(token, { ...prefs, notifyMeToo: v });
               }}
             />
+            <ToggleRow
+              icon="chatbubbles-outline"
+              title="New messages in Discuss"
+              subtitle="At most one every 10 minutes"
+              value={prefs.notifyDiscussion}
+              onChange={(v) => {
+                setPref('notifyDiscussion', v);
+                if (token) savePushToken(token, { ...prefs, notifyDiscussion: v });
+              }}
+            />
           </>
         )}
       </Card>

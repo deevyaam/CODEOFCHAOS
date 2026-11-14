@@ -33,9 +33,12 @@ export type Change = {
   changed_by: string | null;
   changer: string;
   change: {
-    from: ChangeState;
-    to: ChangeState;
+    from?: ChangeState;
+    to?: ChangeState;
     reason: string | null;
+    /** Admin is only ever granted outside the app; such entries carry this flag and a note instead of from/to. */
+    admin_granted?: boolean;
+    note?: string;
   };
 };
 type ChangeState = { role: Role; authority_name: string | null; no_reports: boolean; no_comments: boolean; no_discussion: boolean };
@@ -126,8 +129,10 @@ export async function fetchHistory(userId: string): Promise<Change[]> {
 
 /** One plain sentence per change, e.g. "Made Moderator · Paused comments". */
 export function describeChange(c: Change['change']) {
+  if (c.admin_granted) return 'Made Admin (outside the app)';
   const out: string[] = [];
   const { from, to } = c;
+  if (!from || !to) return c.note || 'Access changed';
   if (from.role !== to.role || (to.role === 'authority' && from.authority_name !== to.authority_name)) {
     out.push(to.role === 'member' ? `Made a Member (was ${ROLE_INFO[from.role].label})` : to.role === 'authority' ? `Made Authority: ${to.authority_name}` : 'Made Moderator');
   }

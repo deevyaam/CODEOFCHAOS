@@ -26,16 +26,20 @@ type Message = {
   reply_to: string | null;
   hidden: boolean;
   created_at: string;
-  /** Set when a moderator or authority removed the message (body and media are then empty). */
+  /** Set when an admin, moderator or authority removed the message (body and media are then empty). */
   deleted_at: string | null;
-  deleted_by_role: 'moderator' | 'authority' | null;
+  deleted_by_role: 'admin' | 'moderator' | 'authority' | null;
 };
 type Reaction = { message_id: string; user_id: string; emoji: string };
 
 const PAGE = 100;
 
 const deletedLabel = (m: Pick<Message, 'deleted_by_role'>) =>
-  m.deleted_by_role === 'authority' ? 'Message deleted by an authority' : 'Message deleted by a moderator';
+  m.deleted_by_role === 'admin'
+    ? 'Message deleted by an admin'
+    : m.deleted_by_role === 'authority'
+      ? 'Message deleted by an authority'
+      : 'Message deleted by a moderator';
 
 /** Short preview of a message for reply quotes. */
 const preview = (m: Message) => (m.deleted_at ? 'Deleted message' : m.body || 'Photo');
@@ -78,7 +82,9 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
   const { colors, type, shadows } = useTheme();
   const { roles, limits } = useSession();
   const isStaff = roles.is_admin || roles.is_moderator || roles.authority_verified;
-  const myRole: Message['deleted_by_role'] = roles.is_admin || roles.is_moderator ? 'moderator' : 'authority';
+  const myRole: Message['deleted_by_role'] = roles.is_admin ? 'admin' : roles.is_moderator ? 'moderator' : 'authority';
+  // Admins can remove anyone's message except another admin's; moderators and authorities only members' messages.
+  const canStaffDelete = (authorBadge: string | null | undefined) => isStaff && (roles.is_admin ? authorBadge !== 'admin' : !authorBadge);
   const paused = limits.no_discussion;
   const insets = useSafeAreaInsets();
   const tabSpace = useTabBarSpace();
@@ -174,7 +180,7 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
     load();
   };
 
-  // Moderators and authorities remove a normal member's message; the room then shows who removed it (by role).
+  // Staff remove someone's message; the room then shows who removed it (by role: admin, moderator or authority).
   const staffDelete = (m: Message) => {
     setActions(null);
     confirmAction(
@@ -380,7 +386,7 @@ function Room({ userId, focused }: { userId: string; focused: boolean }) {
               />
             ) : (
               <>
-                {isStaff && !profiles.get(actions.user_id)?.badge && (
+                {canStaffDelete(profiles.get(actions.user_id)?.badge) && (
                   <Row
                     icon="shield-checkmark-outline"
                     title="Delete for everyone"

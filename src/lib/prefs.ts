@@ -27,6 +27,7 @@ export type Prefs = {
   alertArea: AlertArea;
   notifyMyReports: boolean;
   notifyMeToo: boolean;
+  notifyDiscussion: boolean;
   discussLastRead: string | null;
   assistantLanguage: AssistantLanguage;
 };
@@ -45,6 +46,7 @@ export const DEFAULT_PREFS: Prefs = {
   alertArea: { mode: 'everywhere' },
   notifyMyReports: true,
   notifyMeToo: true,
+  notifyDiscussion: true,
   discussLastRead: null,
   assistantLanguage: 'auto',
 };

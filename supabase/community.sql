@@ -16,10 +16,12 @@ create table if not exists public.discussion_messages (
 );
 create index if not exists discussion_created_idx on public.discussion_messages (created_at desc);
 
--- Removed by staff: the row stays (emptied) so the room shows "Message deleted by a moderator / an authority".
+-- Removed by staff: the row stays (emptied) so the room shows "Message deleted by an admin / a moderator / an authority".
 alter table public.discussion_messages add column if not exists deleted_at timestamptz;
-alter table public.discussion_messages add column if not exists deleted_by_role text
-  check (deleted_by_role in ('moderator', 'authority'));
+alter table public.discussion_messages add column if not exists deleted_by_role text;
+alter table public.discussion_messages drop constraint if exists discussion_messages_deleted_by_role_check;
+alter table public.discussion_messages add constraint discussion_messages_deleted_by_role_check
+  check (deleted_by_role in ('admin', 'moderator', 'authority'));
 -- A message needs text or media, unless staff deleted it. (Replaces the original unnamed check.)
 alter table public.discussion_messages drop constraint if exists discussion_messages_check;
 alter table public.discussion_messages drop constraint if exists discussion_messages_content_check;
@@ -132,7 +134,9 @@ declare
   v_author uuid;
   v_role text;
 begin
-  if public.has_role('moderator') then
+  if public.is_admin() then
+    v_role := 'admin';
+  elsif public.has_role('moderator') then
     v_role := 'moderator';
   elsif public.has_role('authority') then
     v_role := 'authority';
@@ -144,7 +148,12 @@ begin
   if not found then
     raise exception 'Message not found or already deleted';
   end if;
-  if exists (
+  -- Admins can remove anyone's message except another admin's; moderators and authorities only members' messages.
+  if v_role = 'admin' then
+    if exists (select 1 from public.user_roles r where r.user_id = v_author and r.is_admin) then
+      raise exception 'Messages from admins can''t be deleted this way';
+    end if;
+  elsif exists (
     select 1 from public.user_roles r
     where r.user_id = v_author and (r.is_admin or r.is_moderator or r.authority_verified)
   ) then
@@ -212,6 +221,13 @@ alter table public.push_tokens enable row level security;
 drop policy if exists push_own on public.push_tokens;
 create policy push_own on public.push_tokens for all to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()) and not public.is_guest());
+-- Discuss notifications: on by default, and at most one every 10 minutes per phone (see the events function).
+-- Older databases created the queue before 'message_added' existed; widen the allowed kinds.
+alter table public.event_queue drop constraint if exists event_queue_kind_check;
+alter table public.event_queue add constraint event_queue_kind_check
+  check (kind in ('report_created', 'status_changed', 'comment_added', 'message_added', 'test_push', 'media_cleanup'));
+alter table public.push_tokens add column if not exists notify_discussion boolean not null default true;
+alter table public.push_tokens add column if not exists discussion_pushed_at timestamptz;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Event queue → "events" Edge Function (via pg_net). No direct access from the app.
@@ -220,7 +236,7 @@ create policy push_own on public.push_tokens for all to authenticated
 
 create table if not exists public.event_queue (
   id bigint generated always as identity primary key,
-  kind text not null check (kind in ('report_created', 'status_changed', 'comment_added', 'test_push', 'media_cleanup')),
+  kind text not null check (kind in ('report_created', 'status_changed', 'comment_added', 'message_added', 'test_push', 'media_cleanup')),
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   processed_at timestamptz,
@@ -291,6 +307,20 @@ drop trigger if exists comments_queue_event on public.report_comments;
 create trigger comments_queue_event after insert on public.report_comments
   for each row execute function public.queue_comment_event();
 
+-- New Discuss message → notify members who want it (the events function applies blocks and the 10-minute limit).
+create or replace function public.queue_message_event() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not new.hidden and new.deleted_at is null then
+    insert into public.event_queue (kind, payload)
+    values ('message_added', jsonb_build_object('message_id', new.id, 'author_id', new.user_id));
+  end if;
+  return null;
+end $$;
+drop trigger if exists messages_queue_event on public.discussion_messages;
+create trigger messages_queue_event after insert on public.discussion_messages
+  for each row execute function public.queue_message_event();
+
 -- Test notification for the caller's own devices.
 create or replace function public.send_test_push() returns void
 language plpgsql security definer set search_path = '' as $$
@@ -359,7 +389,7 @@ begin
     'touch_updated_at()', 'handle_new_user()', 'reports_before_insert()', 'reports_after_insert()',
     'reports_guard_update()', 'report_votes_count()', 'report_comments_before_insert()',
     'report_comments_after_change()', 'dispatch_event()', 'queue_report_events()',
-    'queue_comment_event()', 'trash_media()'
+    'queue_comment_event()', 'queue_message_event()', 'trash_media()'
   ] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
   end loop;

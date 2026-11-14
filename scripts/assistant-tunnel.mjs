@@ -10,6 +10,7 @@
 // Keep this window open: the assistant works only while it runs (and while this PC is on). Ctrl+C stops it.
 //
 // The key is generated once and kept in .ollama-proxy-key (git-ignored). Delete that file to rotate it.
+import { Buffer } from 'node:buffer';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -129,7 +130,8 @@ function openTunnel() {
       reject(new Error('cloudflared did not give a URL within 60 s'));
     }, 60_000);
     const onData = (d) => {
-      const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      // cloudflared also logs https://api.trycloudflare.com (its own API) when something fails; that isn't our address.
+      const m = d.toString().match(/https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/);
       if (m) {
         clearTimeout(timer);
         resolve({ child, url: m[0] });
@@ -152,14 +154,14 @@ function openTunnel() {
 function saveSecrets(address) {
   const envFile = join(tmpdir(), `lpt-ollama-${process.pid}.env`);
   writeFileSync(envFile, `OLLAMA_URL=${address}\nOLLAMA_API_KEY=${KEY}\nOLLAMA_MODEL=${MODEL}\n`, { mode: 0o600 });
-  const set = spawnSync(`npx supabase@latest secrets set --env-file "${envFile}" --project-ref ${ref} --yes`, {
+  const set = spawnSync(`npx supabase@latest secrets set --env-file "${envFile}" --remote=${ref} --yes`, {
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: true,
     encoding: 'utf8',
   });
   rmSync(envFile, { force: true });
   if (set.status !== 0) {
-    console.error(`✖ Couldn't update the Supabase secrets (is the Supabase CLI signed in?):\n${(set.stderr || set.stdout).replaceAll(KEY, '***')}`);
+    console.error(`✖ Couldn't update the Supabase secrets (exit ${set.status}; is the Supabase CLI signed in?):\n${`${set.stdout}\n${set.stderr}`.trim().replaceAll(KEY, '***')}`);
     return false;
   }
   console.log(`✔ Supabase project ${ref} now uses this tunnel (OLLAMA_URL, OLLAMA_API_KEY, OLLAMA_MODEL)`);
@@ -174,12 +176,19 @@ async function startTunnel() {
       tunnel = t.child;
       url = t.url;
       console.log(`✔ Tunnel ${url}`);
+      // Only a tunnel that dies on its own, after start-up finished, triggers a restart.
       tunnel.on('exit', () => {
         if (stopping || restarting || tunnel !== t.child) return;
         console.error(`✖ [${time()}] The tunnel stopped. Starting a new one…`);
         restart();
       });
-      if (!saveSecrets(url)) throw new Error('secrets not saved');
+      // Retry saving on the same tunnel before giving it up (the network can lag right after boot).
+      let saved = false;
+      for (let i = 0; i < 3 && !saved && !stopping; i++) {
+        if (i) await new Promise((ok) => setTimeout(ok, 10_000));
+        saved = saveSecrets(url);
+      }
+      if (!saved) throw new Error('secrets not saved');
       return;
     } catch (e) {
       tunnel?.kill();
@@ -190,13 +199,17 @@ async function startTunnel() {
   }
 }
 
+/** The single way a new tunnel gets started, so two starts never run at once. */
 async function restart() {
   if (restarting || stopping) return;
   restarting = true;
   tunnel?.kill();
-  await startTunnel();
-  restarting = false;
-  fails = 0;
+  try {
+    await startTunnel();
+  } finally {
+    restarting = false;
+    fails = 0;
+  }
 }
 
 /** Healthy when the public address reaches our proxy: an unauthenticated POST gets the proxy's 401. */
@@ -231,7 +244,7 @@ async function watch() {
   setTimeout(watch, CHECK_EVERY_MS);
 }
 
-await startTunnel();
+await restart();
 console.log('\nThe assistant works while this window stays open. It restarts the tunnel by itself if it drops. Press Ctrl+C to stop.\n');
 setTimeout(watch, CHECK_EVERY_MS);
 
